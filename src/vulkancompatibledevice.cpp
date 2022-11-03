@@ -1,6 +1,8 @@
 
 #include "vulkancompatibledevice.h"
 #include "vulkansurface.h"
+#include <set>
+#include <algorithm>
 
 std::vector<VulkanCompatibleDevice> VulkanCompatibleDevice::FindDevices(const std::shared_ptr<VulkanInstance>& instance, const std::shared_ptr<VulkanSurface>& surface)
 {

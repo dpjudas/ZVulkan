@@ -2,6 +2,8 @@
 #include "vulkaninstance.h"
 #include "vulkanbuilders.h"
 #include <mutex>
+#include <set>
+#include <string>
 
 VulkanInstance::VulkanInstance(bool wantDebugLayer) : WantDebugLayer(wantDebugLayer)
 {

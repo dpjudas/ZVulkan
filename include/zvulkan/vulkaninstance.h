@@ -13,8 +13,6 @@
 #include "vk_mem_alloc/vk_mem_alloc.h"
 #undef min
 #undef max
-#include "ShaderCompiler/glslang/Public/ShaderLang.h"
-#include "ShaderCompiler/spirv/GlslangToSpv.h"
 
 #include <functional>
 #include <memory>
