@@ -4,6 +4,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <cstring>
 
 VulkanInstance::VulkanInstance(bool wantDebugLayer) : WantDebugLayer(wantDebugLayer)
 {
