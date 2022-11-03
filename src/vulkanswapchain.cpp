@@ -150,6 +150,7 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 	if (fullscreen && device->SupportsDeviceExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))
 	{
+#ifdef WIN32
 		VkPhysicalDeviceSurfaceInfo2KHR info = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR };
 		VkSurfaceFullScreenExclusiveInfoEXT exclusiveInfo = { VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT };
 		VkSurfaceFullScreenExclusiveWin32InfoEXT exclusiveWin32Info = { VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_WIN32_INFO_EXT };
@@ -169,7 +170,11 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 
 		surfaceCapabilities = capabilites.surfaceCapabilities;
 		exclusivefullscreen = exclusiveCapabilities.fullScreenExclusiveSupported == VK_TRUE;
-		exclusivefullscreen = false; // hmm!
+
+		exclusivefullscreen = false; // Force it off for now since it doesn't work when vsync is false for some reason
+#else
+		exclusivefullscreen = false;
+#endif
 	}
 	else
 	{
@@ -223,6 +228,7 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 	swapChainCreateInfo.clipped = VK_FALSE;// VK_TRUE;
 	swapChainCreateInfo.oldSwapchain = oldSwapChain;
 
+#ifdef WIN32
 	VkSurfaceFullScreenExclusiveInfoEXT exclusiveInfo = { VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT };
 	VkSurfaceFullScreenExclusiveWin32InfoEXT exclusiveWin32Info = { VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_WIN32_INFO_EXT };
 	if (exclusivefullscreen && device->SupportsDeviceExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))
@@ -232,6 +238,7 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 		exclusiveInfo.pNext = &exclusiveWin32Info;
 		exclusiveWin32Info.hmonitor = MonitorFromWindow(device->Surface->Window, MONITOR_DEFAULTTONEAREST);
 	}
+#endif
 
 	VkResult result = vkCreateSwapchainKHR(device->device, &swapChainCreateInfo, nullptr, &swapChain);
 	if (result != VK_SUCCESS)
