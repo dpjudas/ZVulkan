@@ -11,11 +11,15 @@
 
 #include "volk/volk.h"
 #include "vk_mem_alloc/vk_mem_alloc.h"
+
+#if defined(_WIN32)
 #undef min
 #undef max
+#endif
 
 #include <functional>
 #include <memory>
+#include <string>
 
 class VulkanDeviceFeatures
 {
