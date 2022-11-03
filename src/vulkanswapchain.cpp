@@ -52,10 +52,12 @@ uint32_t VulkanSwapChain::acquireImage(int width, int height, bool fullscreen, V
 		}
 		else if (result == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
 		{
+#ifdef WIN32
 			if (GetForegroundWindow() == device->Surface->Window)
 			{
 				vkAcquireFullScreenExclusiveModeEXT(device->device, swapChain);
 			}
+#endif
 			imageIndex = 0xffffffff;
 			break;
 		}
@@ -91,10 +93,12 @@ void VulkanSwapChain::queuePresent(uint32_t imageIndex, VulkanSemaphore *semapho
 	}
 	else if (result == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
 	{
+#ifdef WIN32
 		if (GetForegroundWindow() == device->Surface->Window)
 		{
 			vkAcquireFullScreenExclusiveModeEXT(device->device, swapChain);
 		}
+#endif
 	}
 	else if (result == VK_ERROR_OUT_OF_HOST_MEMORY || result == VK_ERROR_OUT_OF_DEVICE_MEMORY)
 	{
