@@ -153,7 +153,6 @@ set(VULKAN_INCLUDES
 
 set(EXAMPLE_SOURCES
 	example/example.cpp
-	example/example.h
 )
 
 source_group("src" REGULAR_EXPRESSION "${CMAKE_CURRENT_SOURCE_DIR}/src/.+")
@@ -175,6 +174,8 @@ source_group("src\\volk" REGULAR_EXPRESSION "${CMAKE_CURRENT_SOURCE_DIR}/src/vol
 source_group("include" REGULAR_EXPRESSION "${CMAKE_CURRENT_SOURCE_DIR}/include/zvulkan/.+")
 source_group("include\\vk_mem_alloc" REGULAR_EXPRESSION "${CMAKE_CURRENT_SOURCE_DIR}/include/zvulkan/vk_mem_alloc/.+")
 source_group("include\\volk" REGULAR_EXPRESSION "${CMAKE_CURRENT_SOURCE_DIR}/include/zvulkan/volk/.+")
+
+source_group("example" REGULAR_EXPRESSION "${CMAKE_CURRENT_SOURCE_DIR}/example/.+")
 
 include_directories(include include/zvulkan src)
 
@@ -200,6 +201,6 @@ add_library(zvulkan STATIC ${ZVULKAN_SOURCES} ${ZVULKAN_INCLUDES} ${VULKAN_INCLU
 target_link_libraries(zvulkan ${ZVULKAN_LIBS})
 set_target_properties(zvulkan PROPERTIES CXX_STANDARD 17)
 
-#add_executable(zvulkan_example WIN32 MACOSX_BUNDLE ${EXAMPLE_SOURCES})
-#target_link_libraries(zvulkan_example zvulkan)
-#set_target_properties(zvulkan_example PROPERTIES CXX_STANDARD 17)
+add_executable(zvulkan_example WIN32 MACOSX_BUNDLE ${EXAMPLE_SOURCES})
+target_link_libraries(zvulkan_example zvulkan)
+set_target_properties(zvulkan_example PROPERTIES CXX_STANDARD 17)
