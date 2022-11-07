@@ -204,3 +204,8 @@ set_target_properties(zvulkan PROPERTIES CXX_STANDARD 17)
 add_executable(zvulkan_example WIN32 MACOSX_BUNDLE ${EXAMPLE_SOURCES})
 target_link_libraries(zvulkan_example zvulkan)
 set_target_properties(zvulkan_example PROPERTIES CXX_STANDARD 17)
+
+if(MSVC)
+	set_property(TARGET zvulkan PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+	set_property(TARGET zvulkan_example PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
