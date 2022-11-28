@@ -63,7 +63,9 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.Create();
 
 		// Create a surface for our window
-		auto surface = std::make_shared<VulkanSurface>(instance, hwnd);
+		auto surface = VulkanSurfaceBuilder()
+			.Win32Window(hwnd)
+			.Create(instance);
 
 		// Look for a physical device that will work with our surface and which supports our minimum requirements
 		auto devices = VulkanCompatibleDevice::FindDevices(instance, surface);

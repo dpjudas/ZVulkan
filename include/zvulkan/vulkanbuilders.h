@@ -24,6 +24,28 @@ private:
 	bool debugLayer = false;
 };
 
+class VulkanSurfaceBuilder
+{
+public:
+	VulkanSurfaceBuilder();
+
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+	VulkanSurfaceBuilder& Win32Window(HWND handle);
+#elif defined(VK_USE_PLATFORM_XLIB_KHR)
+	VulkanSurfaceBuilder& X11Window(Display* disp, Window wind);
+#endif
+
+	std::shared_ptr<VulkanSurface> Create(std::shared_ptr<VulkanInstance> instance);
+
+private:
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+	HWND hwnd = {};
+#elif defined(VK_USE_PLATFORM_XLIB_KHR)
+	Display* disp = nullptr;
+	Window wind = {};
+#endif
+};
+
 class ImageBuilder
 {
 public:
