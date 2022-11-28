@@ -219,9 +219,40 @@ CommandPoolBuilder& CommandPoolBuilder::QueueFamily(int index)
 	return *this;
 }
 
-std::shared_ptr<VulkanCommandPool> CommandPoolBuilder::Create(VulkanDevice* device)
+std::unique_ptr<VulkanCommandPool> CommandPoolBuilder::Create(VulkanDevice* device)
 {
-	return std::make_shared<VulkanCommandPool>(device, queueFamilyIndex != -1 ? queueFamilyIndex : device->GraphicsFamily);
+	auto obj = std::make_unique<VulkanCommandPool>(device, queueFamilyIndex != -1 ? queueFamilyIndex : device->GraphicsFamily);
+	if (debugName)
+		obj->SetDebugName(debugName);
+	return obj;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
+SemaphoreBuilder::SemaphoreBuilder()
+{
+}
+
+std::unique_ptr<VulkanSemaphore> SemaphoreBuilder::Create(VulkanDevice* device)
+{
+	auto obj = std::make_unique<VulkanSemaphore>(device);
+	if (debugName)
+		obj->SetDebugName(debugName);
+	return obj;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
+FenceBuilder::FenceBuilder()
+{
+}
+
+std::unique_ptr<VulkanFence> FenceBuilder::Create(VulkanDevice* device)
+{
+	auto obj = std::make_unique<VulkanFence>(device);
+	if (debugName)
+		obj->SetDebugName(debugName);
+	return obj;
 }
 
 /////////////////////////////////////////////////////////////////////////////

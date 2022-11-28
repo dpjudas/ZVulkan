@@ -93,11 +93,37 @@ public:
 	CommandPoolBuilder& QueueFamily(int index);
 	CommandPoolBuilder& DebugName(const char* name) { debugName = name; return *this; }
 
-	std::shared_ptr<VulkanCommandPool> Create(VulkanDevice* device);
+	std::unique_ptr<VulkanCommandPool> Create(VulkanDevice* device);
 
 private:
 	const char* debugName = nullptr;
 	int queueFamilyIndex = -1;
+};
+
+class SemaphoreBuilder
+{
+public:
+	SemaphoreBuilder();
+
+	SemaphoreBuilder& DebugName(const char* name) { debugName = name; return *this; }
+
+	std::unique_ptr<VulkanSemaphore> Create(VulkanDevice* device);
+
+private:
+	const char* debugName = nullptr;
+};
+
+class FenceBuilder
+{
+public:
+	FenceBuilder();
+
+	FenceBuilder& DebugName(const char* name) { debugName = name; return *this; }
+
+	std::unique_ptr<VulkanFence> Create(VulkanDevice* device);
+
+private:
+	const char* debugName = nullptr;
 };
 
 class ImageBuilder

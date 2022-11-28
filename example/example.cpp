@@ -150,17 +150,23 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		// Create a command buffer pool
 		auto commandPool = CommandPoolBuilder()
-			.DebugName("commandpool")
+			.DebugName("commandPool")
 			.Create(device.get());
 
 		// Create semaphore that is set when the swap chain has acquired the image
-		auto imageAvailableSemaphore = std::make_shared<VulkanSemaphore>(device.get());
+		auto imageAvailableSemaphore = SemaphoreBuilder()
+			.DebugName("imageAvailableSemaphore")
+			.Create(device.get());
 
 		// Create semaphore that is set when drawing has completed
-		auto renderFinishedSemaphore = std::make_shared<VulkanSemaphore>(device.get());
+		auto renderFinishedSemaphore = SemaphoreBuilder()
+			.DebugName("renderFinishedSemaphore")
+			.Create(device.get());
 
 		// Create a fence that is set when the command buffer finished executing
-		auto presentFinishedFence = std::make_shared<VulkanFence>(device.get());
+		auto presentFinishedFence = FenceBuilder()
+			.DebugName("presentFinishedFence")
+			.Create(device.get());
 
 		// Draw a scene and pump window messages until the window is closed
 		while (!exitFlag)
