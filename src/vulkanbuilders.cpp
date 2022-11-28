@@ -759,6 +759,10 @@ GraphicsPipelineBuilder::GraphicsPipelineBuilder()
 	inputAssembly.primitiveRestartEnable = VK_FALSE;
 
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.pViewports = &viewport;
+	viewportState.scissorCount = 1;
+	viewportState.pScissors = &scissor;
 
 	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
@@ -849,9 +853,6 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::Viewport(float x, float y, flo
 	viewport.height = height;
 	viewport.minDepth = minDepth;
 	viewport.maxDepth = maxDepth;
-
-	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
 	return *this;
 }
 
@@ -861,9 +862,6 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::Scissor(int x, int y, int widt
 	scissor.offset.y = y;
 	scissor.extent.width = width;
 	scissor.extent.height = height;
-
-	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissor;
 	return *this;
 }
 

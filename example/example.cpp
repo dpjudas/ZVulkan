@@ -144,8 +144,6 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.Layout(pipelineLayout.get())
 			.AddVertexShader(vertexShader.get())
 			.AddFragmentShader(fragmentShader.get())
-			.Viewport(0.0f, 0.0f, 0.0f, 0.0f) // values don't matter because we use VK_DYNAMIC_STATE_VIEWPORT
-			.Scissor(0, 0, 0, 0) // values don't matter because we use VK_DYNAMIC_STATE_SCISSOR
 			.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 			.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 			.DebugName("pipeline")
