@@ -6,7 +6,8 @@
 #include <string>
 #include <cstring>
 
-VulkanInstance::VulkanInstance(bool wantDebugLayer) : WantDebugLayer(wantDebugLayer)
+VulkanInstance::VulkanInstance(std::vector<uint32_t> apiVersionsToTry, std::set<std::string> requiredExtensions, std::set<std::string> optionalExtensions, bool wantDebugLayer)
+	: ApiVersionsToTry(std::move(apiVersionsToTry)), RequiredExtensions(std::move(requiredExtensions)), OptionalExtensions(std::move(optionalExtensions)), WantDebugLayer(wantDebugLayer)
 {
 	try
 	{
@@ -64,8 +65,8 @@ void VulkanInstance::CreateInstance()
 		{
 			if (layer.layerName == debugLayer)
 			{
-				EnabledValidationLayers.push_back(layer.layerName);
-				EnabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+				EnabledValidationLayers.insert(layer.layerName);
+				EnabledExtensions.insert(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 				debugLayerFound = true;
 				break;
 			}
@@ -75,14 +76,19 @@ void VulkanInstance::CreateInstance()
 	// Enable optional instance extensions we are interested in
 	for (const auto& ext : AvailableExtensions)
 	{
-		for (const auto& opt : OptionalExtensions)
+		if (OptionalExtensions.find(ext.extensionName) != OptionalExtensions.end())
 		{
-			if (strcmp(ext.extensionName, opt) == 0)
-			{
-				EnabledExtensions.push_back(opt);
-			}
+			EnabledExtensions.insert(ext.extensionName);
 		}
 	}
+
+	std::vector<const char*> enabledValidationLayersCStr;
+	for (const std::string& layer : EnabledValidationLayers)
+		enabledValidationLayersCStr.push_back(layer.c_str());
+
+	std::vector<const char*> enabledExtensionsCStr;
+	for (const std::string& ext : EnabledExtensions)
+		enabledExtensionsCStr.push_back(ext.c_str());
 
 	// Try get the highest vulkan version we can get
 	VkResult result = VK_ERROR_INITIALIZATION_FAILED;
@@ -100,9 +106,9 @@ void VulkanInstance::CreateInstance()
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
 		createInfo.enabledExtensionCount = (uint32_t)EnabledExtensions.size();
-		createInfo.enabledLayerCount = (uint32_t)EnabledValidationLayers.size();
-		createInfo.ppEnabledLayerNames = EnabledValidationLayers.data();
-		createInfo.ppEnabledExtensionNames = EnabledExtensions.data();
+		createInfo.enabledLayerCount = (uint32_t)enabledValidationLayersCStr.size();
+		createInfo.ppEnabledLayerNames = enabledValidationLayersCStr.data();
+		createInfo.ppEnabledExtensionNames = enabledExtensionsCStr.data();
 
 		result = vkCreateInstance(&createInfo, nullptr, &Instance);
 		if (result >= VK_SUCCESS)

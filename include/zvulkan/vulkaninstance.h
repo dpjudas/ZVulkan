@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <set>
 
 class VulkanDeviceFeatures
 {
@@ -46,33 +47,19 @@ public:
 class VulkanInstance
 {
 public:
-	VulkanInstance(bool wantDebugLayer);
+	VulkanInstance(std::vector<uint32_t> apiVersionsToTry, std::set<std::string> requiredExtensions, std::set<std::string> optionalExtensions, bool wantDebugLayer);
 	~VulkanInstance();
 
-	std::vector<const char*> RequiredExtensions =
-	{
-		VK_KHR_SURFACE_EXTENSION_NAME,
-#if defined(VK_USE_PLATFORM_WIN32_KHR)
-		VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-#elif defined(VK_USE_PLATFORM_MACOS_MVK)
-		VK_MVK_MACOS_SURFACE_EXTENSION_NAME
-#elif defined(VK_USE_PLATFORM_XLIB_KHR)
-		VK_KHR_XLIB_SURFACE_EXTENSION_NAME
-#endif
-	};
-	std::vector<const char*> OptionalExtensions =
-	{
-		VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
-		VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
-		VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-	};
-	std::vector<uint32_t> ApiVersionsToTry = { VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0 };
+	std::vector<uint32_t> ApiVersionsToTry;
+
+	std::set<std::string> RequiredExtensions;
+	std::set<std::string> OptionalExtensions;
 
 	std::vector<VkLayerProperties> AvailableLayers;
 	std::vector<VkExtensionProperties> AvailableExtensions;
 
-	std::vector<const char*> EnabledValidationLayers;
-	std::vector<const char*> EnabledExtensions;
+	std::set<std::string> EnabledValidationLayers;
+	std::set<std::string> EnabledExtensions;
 
 	std::vector<VulkanPhysicalDevice> PhysicalDevices;
 

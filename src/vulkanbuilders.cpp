@@ -1433,3 +1433,61 @@ void WriteDescriptors::Execute(VulkanDevice* device)
 	if (!writes.empty())
 		vkUpdateDescriptorSets(device->device, (uint32_t)writes.size(), writes.data(), 0, nullptr);
 }
+
+/////////////////////////////////////////////////////////////////////////////
+
+VulkanInstanceBuilder::VulkanInstanceBuilder()
+{
+	apiVersionsToTry = { VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0 };
+
+	OptionalExtension(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+	OptionalExtension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+}
+
+VulkanInstanceBuilder& VulkanInstanceBuilder::ApiVersionsToTry(const std::vector<uint32_t>& versions)
+{
+	apiVersionsToTry = versions;
+	return *this;
+}
+
+VulkanInstanceBuilder& VulkanInstanceBuilder::RequireExtension(const std::string& extensionName)
+{
+	requiredExtensions.insert(extensionName);
+	return *this;
+}
+
+VulkanInstanceBuilder& VulkanInstanceBuilder::RequireSurfaceExtensions(bool enable)
+{
+	if (enable)
+	{
+		RequireExtension(VK_KHR_SURFACE_EXTENSION_NAME);
+
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+		RequireExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#elif defined(VK_USE_PLATFORM_MACOS_MVK)
+		RequireExtension(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
+#elif defined(VK_USE_PLATFORM_XLIB_KHR)
+		RequireExtension(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+#endif
+
+		OptionalExtension(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME); // For HDR support
+	}
+	return *this;
+}
+
+VulkanInstanceBuilder& VulkanInstanceBuilder::OptionalExtension(const std::string& extensionName)
+{
+	optionalExtensions.insert(extensionName);
+	return *this;
+}
+
+VulkanInstanceBuilder& VulkanInstanceBuilder::DebugLayer(bool enable)
+{
+	debugLayer = enable;
+	return *this;
+}
+
+std::shared_ptr<VulkanInstance> VulkanInstanceBuilder::Create()
+{
+	return std::make_shared<VulkanInstance>(apiVersionsToTry, requiredExtensions, optionalExtensions, debugLayer);
+}

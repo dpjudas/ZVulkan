@@ -2,6 +2,27 @@
 
 #include "vulkanobjects.h"
 #include <cassert>
+#include <set>
+
+class VulkanInstanceBuilder
+{
+public:
+	VulkanInstanceBuilder();
+
+	VulkanInstanceBuilder& ApiVersionsToTry(const std::vector<uint32_t>& versions);
+	VulkanInstanceBuilder& RequireExtension(const std::string& extensionName);
+	VulkanInstanceBuilder& RequireSurfaceExtensions(bool enable = true);
+	VulkanInstanceBuilder& OptionalExtension(const std::string& extensionName);
+	VulkanInstanceBuilder& DebugLayer(bool enable = true);
+
+	std::shared_ptr<VulkanInstance> Create();
+
+private:
+	std::vector<uint32_t> apiVersionsToTry;
+	std::set<std::string> requiredExtensions;
+	std::set<std::string> optionalExtensions;
+	bool debugLayer = false;
+};
 
 class ImageBuilder
 {

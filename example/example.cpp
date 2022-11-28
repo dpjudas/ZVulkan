@@ -57,7 +57,10 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			throw std::runtime_error("CreateWindowEx failed");
 
 		// Create vulkan instance
-		auto instance = std::make_shared<VulkanInstance>(false);
+		auto instance = VulkanInstanceBuilder()
+			.RequireSurfaceExtensions()
+			.DebugLayer(false)
+			.Create();
 
 		// Create a surface for our window
 		auto surface = std::make_shared<VulkanSurface>(instance, hwnd);
