@@ -149,7 +149,9 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.Create(device.get());
 
 		// Create a command buffer pool
-		auto commandPool = std::make_shared<VulkanCommandPool>(device.get(), device->GraphicsFamily);
+		auto commandPool = CommandPoolBuilder()
+			.DebugName("commandpool")
+			.Create(device.get());
 
 		// Create semaphore that is set when the swap chain has acquired the image
 		auto imageAvailableSemaphore = std::make_shared<VulkanSemaphore>(device.get());

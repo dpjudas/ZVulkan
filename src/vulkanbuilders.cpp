@@ -209,6 +209,23 @@ std::unique_ptr<VulkanShader> ShaderBuilder::Create(const char *shadername, Vulk
 
 /////////////////////////////////////////////////////////////////////////////
 
+CommandPoolBuilder::CommandPoolBuilder()
+{
+}
+
+CommandPoolBuilder& CommandPoolBuilder::QueueFamily(int index)
+{
+	queueFamilyIndex = index;
+	return *this;
+}
+
+std::shared_ptr<VulkanCommandPool> CommandPoolBuilder::Create(VulkanDevice* device)
+{
+	return std::make_shared<VulkanCommandPool>(device, queueFamilyIndex != -1 ? queueFamilyIndex : device->GraphicsFamily);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
 ImageBuilder::ImageBuilder()
 {
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;

@@ -85,6 +85,21 @@ private:
 	bool hdr = false;
 };
 
+class CommandPoolBuilder
+{
+public:
+	CommandPoolBuilder();
+
+	CommandPoolBuilder& QueueFamily(int index);
+	CommandPoolBuilder& DebugName(const char* name) { debugName = name; return *this; }
+
+	std::shared_ptr<VulkanCommandPool> Create(VulkanDevice* device);
+
+private:
+	const char* debugName = nullptr;
+	int queueFamilyIndex = -1;
+};
+
 class ImageBuilder
 {
 public:
