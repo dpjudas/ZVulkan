@@ -73,7 +73,9 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.Create(instance);
 
 		// Create a swap chain for our window
-		auto swapchain = std::make_shared<VulkanSwapChain>(device.get(), true);
+		auto swapchain = VulkanSwapChainBuilder()
+			.VSync(true)
+			.Create(device.get());
 
 		// GLSL for a vertex shader
 		std::string vertexCode = R"(

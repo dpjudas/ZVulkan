@@ -2,6 +2,7 @@
 #include "vulkanbuilders.h"
 #include "vulkansurface.h"
 #include "vulkancompatibledevice.h"
+#include "vulkanswapchain.h"
 #include "glslang/glslang/Public/ShaderLang.h"
 #include "glslang/spirv/GlslangToSpv.h"
 
@@ -1699,4 +1700,27 @@ std::shared_ptr<VulkanDevice> VulkanDeviceBuilder::Create(std::shared_ptr<Vulkan
 	if (selected >= supportedDevices.size())
 		selected = 0;
 	return std::make_shared<VulkanDevice>(instance, surface, supportedDevices[selected]);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
+VulkanSwapChainBuilder::VulkanSwapChainBuilder()
+{
+}
+
+VulkanSwapChainBuilder& VulkanSwapChainBuilder::VSync(bool enable)
+{
+	vsync = enable;
+	return *this;
+}
+
+VulkanSwapChainBuilder& VulkanSwapChainBuilder::Hdr(bool enable)
+{
+	hdr = enable;
+	return *this;
+}
+
+std::shared_ptr<VulkanSwapChain> VulkanSwapChainBuilder::Create(VulkanDevice* device)
+{
+	return std::make_shared<VulkanSwapChain>(device, vsync/*, hdr*/);
 }
