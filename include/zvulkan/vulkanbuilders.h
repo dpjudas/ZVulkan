@@ -4,6 +4,8 @@
 #include <cassert>
 #include <set>
 
+class VulkanCompatibleDevice;
+
 class VulkanInstanceBuilder
 {
 public:
@@ -44,6 +46,28 @@ private:
 	Display* disp = nullptr;
 	Window wind = {};
 #endif
+};
+
+class VulkanDeviceBuilder
+{
+public:
+	VulkanDeviceBuilder();
+
+	VulkanDeviceBuilder& RequireExtension(const std::string& extensionName);
+	VulkanDeviceBuilder& OptionalExtension(const std::string& extensionName);
+	VulkanDeviceBuilder& OptionalRayQuery();
+	VulkanDeviceBuilder& OptionalDescriptorIndexing();
+	VulkanDeviceBuilder& Surface(std::shared_ptr<VulkanSurface> surface);
+	VulkanDeviceBuilder& SelectDevice(int index);
+
+	std::vector<VulkanCompatibleDevice> FindDevices(const std::shared_ptr<VulkanInstance>& instance);
+	std::shared_ptr<VulkanDevice> Create(std::shared_ptr<VulkanInstance> instance);
+
+private:
+	std::set<std::string> requiredDeviceExtensions;
+	std::set<std::string> optionalDeviceExtensions;
+	std::shared_ptr<VulkanSurface> surface;
+	int deviceIndex = 0;
 };
 
 class ImageBuilder

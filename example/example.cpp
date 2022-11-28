@@ -67,13 +67,10 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.Win32Window(hwnd)
 			.Create(instance);
 
-		// Look for a physical device that will work with our surface and which supports our minimum requirements
-		auto devices = VulkanCompatibleDevice::FindDevices(instance, surface);
-		if (devices.empty())
-			throw std::runtime_error("No compatible vulkan devices found");
-
-		// Create the vulkan device for the physical device
-		auto device = std::make_shared<VulkanDevice>(instance, surface, devices.front());
+		// Create the vulkan device
+		auto device = VulkanDeviceBuilder()
+			.Surface(surface)
+			.Create(instance);
 
 		// Create a swap chain for our window
 		auto swapchain = std::make_shared<VulkanSwapChain>(device.get(), true);
@@ -126,7 +123,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.DebugName("fragmentShader")
 			.Create("frag", device.get());
 
-		// Create a render pass where we clear the frame buffer when it begins and ends the pass by transitioning the image to what the swap chain need to present it
+		// Create a render pass where we clear the frame buffer when it begins and ends the pass by transitioning the image to what the swap chain needs to present it
 		auto renderPass = RenderPassBuilder()
 			.AddAttachment(VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
 			.AddSubpass()

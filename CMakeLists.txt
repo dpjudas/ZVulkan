@@ -3,7 +3,6 @@ project(zvulkan)
 
 set(ZVULKAN_SOURCES
 	src/vulkanbuilders.cpp
-	src/vulkancompatibledevice.cpp
 	src/vulkandevice.cpp
 	src/vulkaninstance.cpp
 	src/vulkansurface.cpp

@@ -21,7 +21,7 @@ public:
 	VulkanDevice(std::shared_ptr<VulkanInstance> instance, std::shared_ptr<VulkanSurface> surface, const VulkanCompatibleDevice& selectedDevice);
 	~VulkanDevice();
 
-	std::vector<std::string> EnabledDeviceExtensions;
+	std::set<std::string> EnabledDeviceExtensions;
 	VulkanDeviceFeatures EnabledFeatures;
 
 	VulkanPhysicalDevice PhysicalDevice;

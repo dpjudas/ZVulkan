@@ -35,7 +35,7 @@ VulkanDevice::~VulkanDevice()
 
 bool VulkanDevice::SupportsDeviceExtension(const char* ext) const
 {
-	return std::find(EnabledDeviceExtensions.begin(), EnabledDeviceExtensions.end(), ext) != EnabledDeviceExtensions.end();
+	return EnabledDeviceExtensions.find(ext) != EnabledDeviceExtensions.end();
 }
 
 void VulkanDevice::CreateAllocator()
