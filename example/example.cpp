@@ -74,7 +74,6 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		// Create a swap chain for our window
 		auto swapchain = VulkanSwapChainBuilder()
-			.VSync(true)
 			.Create(device.get());
 
 		// GLSL for a vertex shader
@@ -168,6 +167,10 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.DebugName("presentFinishedFence")
 			.Create(device.get());
 
+		std::vector<std::unique_ptr<VulkanFramebuffer>> framebuffers;
+		int lastWidth = 0;
+		int lastHeight = 0;
+
 		// Draw a scene and pump window messages until the window is closed
 		while (!exitFlag)
 		{
@@ -190,18 +193,31 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			int width = clientRect.right;
 			int height = clientRect.bottom;
 
-			// Try acquire a frame buffer image from the swap chain
-			uint32_t imageIndex = swapchain->acquireImage(width, height, false, imageAvailableSemaphore.get());
-			if (imageIndex != 0xffffffff)
+			// Do we need to resize or recreate the swapchain?
+			if (width > 0 && height > 0 && width != lastWidth || height != lastHeight || swapchain->Lost())
 			{
-				// Create a frame buffer object
-				auto framebuffer = FramebufferBuilder()
-					.RenderPass(renderPass.get())
-					.AddAttachment(swapchain->swapChainImageViews[imageIndex])
-					.Size(width, height)
-					.DebugName("framebuffer")
-					.Create(device.get());
+				lastWidth = width;
+				lastHeight = height;
+				framebuffers.clear();
 
+				swapchain->Create(width, height, 1, true, false, false);
+
+				// Create frame buffer objects for the new swap chain images
+				for (int imageIndex = 0; imageIndex < swapchain->ImageCount(); imageIndex++)
+				{
+					framebuffers.push_back(FramebufferBuilder()
+						.RenderPass(renderPass.get())
+						.AddAttachment(swapchain->GetImageView(imageIndex))
+						.Size(width, height)
+						.DebugName("framebuffer")
+						.Create(device.get()));
+				}
+			}
+
+			// Try acquire a frame buffer image from the swap chain
+			int imageIndex = swapchain->AcquireImage(imageAvailableSemaphore.get());
+			if (imageIndex != -1)
+			{
 				// Create a command buffer and begin adding commands to it
 				auto commands = commandPool->createBuffer();
 				commands->begin();
@@ -209,7 +225,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 				// Begin a render pass
 				RenderPassBegin()
 					.RenderPass(renderPass.get())
-					.Framebuffer(framebuffer.get())
+					.Framebuffer(framebuffers[imageIndex].get())
 					.AddClearColor(0.0f, 0.0f, 0.1f, 1.0f)
 					.AddClearDepthStencil(1.0f, 0)
 					.RenderArea(0, 0, width, height)
@@ -246,7 +262,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 					.Execute(device.get(), device->GraphicsQueue, presentFinishedFence.get());
 
 				// Present the frame buffer image
-				swapchain->queuePresent(imageIndex, renderFinishedSemaphore.get());
+				swapchain->QueuePresent(imageIndex, renderFinishedSemaphore.get());
 
 				// Wait for the swapchain present to finish
 				vkWaitForFences(device->device, 1, &presentFinishedFence->fence, VK_TRUE, std::numeric_limits<uint64_t>::max());

@@ -2,153 +2,141 @@
 #include "vulkanswapchain.h"
 #include "vulkanobjects.h"
 #include "vulkansurface.h"
+#include "vulkanbuilders.h"
 
-VulkanSwapChain::VulkanSwapChain(VulkanDevice *device, bool vsync) : vsync(vsync), device(device)
+VulkanSwapChain::VulkanSwapChain(VulkanDevice* device) : device(device)
 {
 }
 
 VulkanSwapChain::~VulkanSwapChain()
 {
-	releaseResources();
+	views.clear();
+	images.clear();
+	if (swapchain)
+		vkDestroySwapchainKHR(device->device, swapchain, nullptr);
 }
 
-uint32_t VulkanSwapChain::acquireImage(int width, int height, bool fullscreen, VulkanSemaphore *semaphore, VulkanFence *fence)
+void VulkanSwapChain::Create(int width, int height, int imageCount, bool vsync, bool hdr, bool exclusivefullscreen)
 {
-	if (width <= 0 || height <= 0)
-		return 0xffffffff;
+	views.clear();
+	images.clear();
+	lost = false;
 
-	if (lastSwapWidth != width || lastSwapHeight != height || !swapChain || lastFullscreen != fullscreen)
+	SelectFormat(hdr);
+	SelectPresentMode(vsync, exclusivefullscreen);
+
+	VkSwapchainKHR oldSwapchain = swapchain;
+	CreateSwapchain(width, height, exclusivefullscreen, oldSwapchain);
+	if (oldSwapchain)
+		vkDestroySwapchainKHR(device->device, oldSwapchain, nullptr);
+
+	if (exclusivefullscreen && lost)
 	{
-		recreate(width, height, fullscreen);
-		lastSwapWidth = width;
-		lastSwapHeight = height;
-		lastFullscreen = fullscreen;
+		// We could not acquire exclusive fullscreen. Fall back to normal fullsceen instead.
+		exclusivefullscreen = false;
+
+		SelectFormat(hdr);
+		SelectPresentMode(vsync, exclusivefullscreen);
+
+		oldSwapchain = swapchain;
+		CreateSwapchain(width, height, exclusivefullscreen, oldSwapchain);
+		if (oldSwapchain)
+			vkDestroySwapchainKHR(device->device, oldSwapchain, nullptr);
 	}
 
-	uint32_t imageIndex;
-	while (true)
+	if (swapchain)
 	{
-		if (!swapChain)
-		{
-			imageIndex = 0xffffffff;
-			break;
-		}
+		uint32_t imageCount;
+		VkResult result = vkGetSwapchainImagesKHR(device->device, swapchain, &imageCount, nullptr);
+		if (result != VK_SUCCESS)
+			throw std::runtime_error("vkGetSwapchainImagesKHR failed");
 
-		VkResult result = vkAcquireNextImageKHR(device->device, swapChain, 1'000'000'000, semaphore ? semaphore->semaphore : VK_NULL_HANDLE, fence ? fence->fence : VK_NULL_HANDLE, &imageIndex);
-		if (result == VK_SUCCESS)
+		std::vector<VkImage> swapchainImages;
+		swapchainImages.resize(imageCount);
+		result = vkGetSwapchainImagesKHR(device->device, swapchain, &imageCount, swapchainImages.data());
+		if (result != VK_SUCCESS)
+			throw std::runtime_error("vkGetSwapchainImagesKHR failed (2)");
+
+		for (VkImage vkimage : swapchainImages)
 		{
-			break;
+			auto image = std::make_unique<VulkanImage>(device, vkimage, VK_NULL_HANDLE, actualExtent.width, actualExtent.height, 1, 1);
+			auto view = ImageViewBuilder()
+				.Type(VK_IMAGE_VIEW_TYPE_2D)
+				.Image(image.get(), format.format)
+				.DebugName("SwapchainImageView")
+				.Create(device);
+			images.push_back(std::move(image));
+			views.push_back(std::move(view));
 		}
-		else if (result == VK_SUBOPTIMAL_KHR)
+	}
+}
+
+void VulkanSwapChain::SelectFormat(bool hdr)
+{
+	std::vector<VkSurfaceFormatKHR> surfaceFormats = GetSurfaceFormats();
+	if (surfaceFormats.empty())
+		throw std::runtime_error("No surface formats supported");
+
+	if (surfaceFormats.size() == 1 && surfaceFormats.front().format == VK_FORMAT_UNDEFINED)
+	{
+		format.format = VK_FORMAT_B8G8R8A8_UNORM;
+		format.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+		return;
+	}
+
+	if (hdr)
+	{
+		for (const auto& f : surfaceFormats)
 		{
-			lastSwapWidth = 0;
-			lastSwapHeight = 0;
-			lastFullscreen = false;
-			break;
-		}
-		else if (result == VK_ERROR_OUT_OF_DATE_KHR)
-		{
-			recreate(width, height, fullscreen);
-		}
-		else if (result == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
-		{
-#ifdef WIN32
-			if (GetForegroundWindow() == device->Surface->Window)
+			if (f.format == VK_FORMAT_R16G16B16A16_SFLOAT && f.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT)
 			{
-				vkAcquireFullScreenExclusiveModeEXT(device->device, swapChain);
+				format = f;
+				return;
 			}
-#endif
-			imageIndex = 0xffffffff;
-			break;
-		}
-		else if (result == VK_NOT_READY || result == VK_TIMEOUT)
-		{
-			imageIndex = 0xffffffff;
-			break;
-		}
-		else
-		{
-			throw std::runtime_error("Failed to acquire next image!");
 		}
 	}
-	return imageIndex;
+
+	for (const auto& f : surfaceFormats)
+	{
+		if (f.format == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		{
+			format = f;
+			return;
+		}
+	}
+
+	format = surfaceFormats.front();
 }
 
-void VulkanSwapChain::queuePresent(uint32_t imageIndex, VulkanSemaphore *semaphore)
+void VulkanSwapChain::SelectPresentMode(bool vsync, bool exclusivefullscreen)
 {
-	VkPresentInfoKHR presentInfo = {};
-	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	presentInfo.waitSemaphoreCount = semaphore ? 1 : 0;
-	presentInfo.pWaitSemaphores = semaphore ? &semaphore->semaphore : VK_NULL_HANDLE;
-	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &swapChain;
-	presentInfo.pImageIndices = &imageIndex;
-	presentInfo.pResults = nullptr;
-	VkResult result = vkQueuePresentKHR(device->PresentQueue, &presentInfo);
-	if (result == VK_SUBOPTIMAL_KHR || result == VK_ERROR_OUT_OF_DATE_KHR)
-	{
-		lastSwapWidth = 0;
-		lastSwapHeight = 0;
-		lastFullscreen = false;
-	}
-	else if (result == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
-	{
-#ifdef WIN32
-		if (GetForegroundWindow() == device->Surface->Window)
-		{
-			vkAcquireFullScreenExclusiveModeEXT(device->device, swapChain);
-		}
-#endif
-	}
-	else if (result == VK_ERROR_OUT_OF_HOST_MEMORY || result == VK_ERROR_OUT_OF_DEVICE_MEMORY)
-	{
-		// The spec says we can recover from this.
-		// However, if we are out of memory it is better to crash now than in some other weird place further away from the source of the problem.
+	std::vector<VkPresentModeKHR> presentModes = GetPresentModes(exclusivefullscreen);
+	if (presentModes.empty())
+		throw std::runtime_error("No surface present modes supported");
 
-		throw std::runtime_error("vkQueuePresentKHR failed: out of memory");
-	}
-	else if (result == VK_ERROR_DEVICE_LOST)
+	presentMode = VK_PRESENT_MODE_FIFO_KHR;
+	if (vsync)
 	{
-		throw std::runtime_error("vkQueuePresentKHR failed: device lost");
+		bool supportsFifoRelaxed = std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_FIFO_RELAXED_KHR) != presentModes.end();
+		if (supportsFifoRelaxed)
+			presentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
 	}
-	else if (result == VK_ERROR_SURFACE_LOST_KHR)
+	else
 	{
-		throw std::runtime_error("vkQueuePresentKHR failed: surface lost");
-	}
-	else if (result != VK_SUCCESS)
-	{
-		throw std::runtime_error("vkQueuePresentKHR failed");
+		bool supportsMailbox = std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_MAILBOX_KHR) != presentModes.end();
+		bool supportsImmediate = std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_IMMEDIATE_KHR) != presentModes.end();
+		if (supportsMailbox)
+			presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+		else if (supportsImmediate)
+			presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 	}
 }
 
-void VulkanSwapChain::recreate(int width, int height, bool fullscreen)
-{
-	newSwapChain = true;
-
-	releaseViews();
-	swapChainImages.clear();
-
-	selectFormat();
-	selectPresentMode(fullscreen);
-
-	VkSwapchainKHR oldSwapChain = swapChain;
-	createSwapChain(width, height, fullscreen, oldSwapChain);
-	if (oldSwapChain)
-		vkDestroySwapchainKHR(device->device, oldSwapChain, nullptr);
-
-	if (swapChain)
-	{
-		getImages();
-		createViews();
-	}
-}
-
-bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, VkSwapchainKHR oldSwapChain)
+bool VulkanSwapChain::CreateSwapchain(int width, int height, bool exclusivefullscreen, VkSwapchainKHR oldSwapChain)
 {
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 #ifdef WIN32
-	bool exclusivefullscreen = false;
-	if (fullscreen && device->SupportsDeviceExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))
+	if (exclusivefullscreen && device->SupportsDeviceExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))
 	{
 		VkPhysicalDeviceSurfaceInfo2KHR info = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR };
 		VkSurfaceFullScreenExclusiveInfoEXT exclusiveInfo = { VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT };
@@ -169,15 +157,13 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 
 		surfaceCapabilities = capabilites.surfaceCapabilities;
 		exclusivefullscreen = exclusiveCapabilities.fullScreenExclusiveSupported == VK_TRUE;
-
-		exclusivefullscreen = false; // Force it off for now since it doesn't work when vsync is false for some reason
 	}
 	else
 	{
 		VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->PhysicalDevice.Device, device->Surface->Surface, &surfaceCapabilities);
 		if (result != VK_SUCCESS)
 			throw std::runtime_error("vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed");
-		fullscreen = false;
+		exclusivefullscreen = false;
 	}
 #endif
 
@@ -186,7 +172,7 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 	actualExtent.height = std::max(surfaceCapabilities.minImageExtent.height, std::min(surfaceCapabilities.maxImageExtent.height, actualExtent.height));
 	if (actualExtent.width == 0 || actualExtent.height == 0)
 	{
-		swapChain = VK_NULL_HANDLE;
+		swapchain = VK_NULL_HANDLE;
 		return false;
 	}
 
@@ -199,8 +185,8 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 	VkSwapchainCreateInfoKHR swapChainCreateInfo = { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
 	swapChainCreateInfo.surface = device->Surface->Surface;
 	swapChainCreateInfo.minImageCount = imageCount;
-	swapChainCreateInfo.imageFormat = swapChainFormat.format;
-	swapChainCreateInfo.imageColorSpace = swapChainFormat.colorSpace;
+	swapChainCreateInfo.imageFormat = format.format;
+	swapChainCreateInfo.imageColorSpace = format.colorSpace;
 	swapChainCreateInfo.imageExtent = actualExtent;
 	swapChainCreateInfo.imageArrayLayers = 1;
 	swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -221,7 +207,7 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 
 	swapChainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
 	swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // If alpha channel is passed on to the DWM or not
-	swapChainCreateInfo.presentMode = swapChainPresentMode;
+	swapChainCreateInfo.presentMode = presentMode;
 	swapChainCreateInfo.clipped = VK_FALSE;// VK_TRUE;
 	swapChainCreateInfo.oldSwapchain = oldSwapChain;
 
@@ -237,132 +223,91 @@ bool VulkanSwapChain::createSwapChain(int width, int height, bool fullscreen, Vk
 	}
 #endif
 
-	VkResult result = vkCreateSwapchainKHR(device->device, &swapChainCreateInfo, nullptr, &swapChain);
+	VkResult result = vkCreateSwapchainKHR(device->device, &swapChainCreateInfo, nullptr, &swapchain);
 	if (result != VK_SUCCESS)
 	{
-		swapChain = VK_NULL_HANDLE;
+		swapchain = VK_NULL_HANDLE;
 		return false;
 	}
 
 #ifdef WIN32
 	if (exclusivefullscreen && device->SupportsDeviceExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))
 	{
-		vkAcquireFullScreenExclusiveModeEXT(device->device, swapChain);
+		result = vkAcquireFullScreenExclusiveModeEXT(device->device, swapchain);
+		if (result != VK_SUCCESS)
+		{
+			lost = true;
+		}
 	}
 #endif
 
 	return true;
 }
 
-void VulkanSwapChain::createViews()
+int VulkanSwapChain::AcquireImage(VulkanSemaphore* semaphore, VulkanFence* fence)
 {
-	swapChainImageViews.reserve(swapChainImages.size());
-	for (size_t i = 0; i < swapChainImages.size(); i++)
+	if (lost)
+		return -1;
+
+	uint32_t imageIndex;
+	VkResult result = vkAcquireNextImageKHR(device->device, swapchain, 1'000'000'000, semaphore ? semaphore->semaphore : VK_NULL_HANDLE, fence ? fence->fence : VK_NULL_HANDLE, &imageIndex);
+	if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
 	{
-		device->SetObjectName("SwapChainImage", (uint64_t)swapChainImages[i], VK_OBJECT_TYPE_IMAGE);
-
-		VkImageViewCreateInfo createInfo = {};
-		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		createInfo.image = swapChainImages[i];
-		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		createInfo.format = swapChainFormat.format;
-		createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		createInfo.subresourceRange.baseMipLevel = 0;
-		createInfo.subresourceRange.levelCount = 1;
-		createInfo.subresourceRange.baseArrayLayer = 0;
-		createInfo.subresourceRange.layerCount = 1;
-
-		VkImageView view;
-		VkResult result = vkCreateImageView(device->device, &createInfo, nullptr, &view);
-		if (result != VK_SUCCESS)
-			throw std::runtime_error("Could not create image view for swapchain image");
-
-		device->SetObjectName("SwapChainImageView", (uint64_t)view, VK_OBJECT_TYPE_IMAGE_VIEW);
-
-		swapChainImageViews.push_back(view);
+		return imageIndex;
 	}
-}
-
-void VulkanSwapChain::selectFormat()
-{
-	std::vector<VkSurfaceFormatKHR> surfaceFormats = getSurfaceFormats();
-	if (surfaceFormats.empty())
-		throw std::runtime_error("No surface formats supported");
-
-	if (surfaceFormats.size() == 1 && surfaceFormats.front().format == VK_FORMAT_UNDEFINED)
+	else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
 	{
-		swapChainFormat.format = VK_FORMAT_B8G8R8A8_UNORM;
-		swapChainFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-		return;
+		lost = true;
+		return -1;
 	}
-
-	for (const auto &format : surfaceFormats)
+	else if (result == VK_NOT_READY || result == VK_TIMEOUT)
 	{
-		if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-		{
-			swapChainFormat = format;
-			return;
-		}
-	}
-
-	swapChainFormat = surfaceFormats.front();
-}
-
-void VulkanSwapChain::selectPresentMode(bool fullscreen)
-{
-	std::vector<VkPresentModeKHR> presentModes = getPresentModes(fullscreen);
-
-	if (presentModes.empty())
-		throw std::runtime_error("No surface present modes supported");
-
-	swapChainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
-	if (vsync)
-	{
-		bool supportsFifoRelaxed = std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_FIFO_RELAXED_KHR) != presentModes.end();
-		if (supportsFifoRelaxed)
-			swapChainPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+		return -1;
 	}
 	else
 	{
-		bool supportsMailbox = std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_MAILBOX_KHR) != presentModes.end();
-		bool supportsImmediate = std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_IMMEDIATE_KHR) != presentModes.end();
-		if (supportsMailbox)
-			swapChainPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-		else if (supportsImmediate)
-			swapChainPresentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+		throw std::runtime_error("Failed to acquire next image!");
 	}
 }
 
-void VulkanSwapChain::getImages()
+void VulkanSwapChain::QueuePresent(int imageIndex, VulkanSemaphore* semaphore)
 {
-	uint32_t imageCount;
-	VkResult result = vkGetSwapchainImagesKHR(device->device, swapChain, &imageCount, nullptr);
-	if (result != VK_SUCCESS)
-		throw std::runtime_error("vkGetSwapchainImagesKHR failed");
-
-	swapChainImages.resize(imageCount);
-	result = vkGetSwapchainImagesKHR(device->device, swapChain, &imageCount, swapChainImages.data());
-	if (result != VK_SUCCESS)
-		throw std::runtime_error("vkGetSwapchainImagesKHR failed (2)");
-}
-
-void VulkanSwapChain::releaseViews()
-{
-	for (auto &view : swapChainImageViews)
+	uint32_t index = imageIndex;
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = semaphore ? 1 : 0;
+	presentInfo.pWaitSemaphores = semaphore ? &semaphore->semaphore : VK_NULL_HANDLE;
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &swapchain;
+	presentInfo.pImageIndices = &index;
+	presentInfo.pResults = nullptr;
+	VkResult result = vkQueuePresentKHR(device->PresentQueue, &presentInfo);
+	if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
 	{
-		vkDestroyImageView(device->device, view, nullptr);
+		return;
 	}
-	swapChainImageViews.clear();
+	else if (result == VK_ERROR_OUT_OF_DATE_KHR  || result == VK_ERROR_SURFACE_LOST_KHR || result == VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
+	{
+		lost = true;
+	}
+	else if (result == VK_ERROR_OUT_OF_HOST_MEMORY || result == VK_ERROR_OUT_OF_DEVICE_MEMORY)
+	{
+		// The spec says we can recover from this.
+		// However, if we are out of memory it is better to crash now than in some other weird place further away from the source of the problem.
+
+		throw std::runtime_error("vkQueuePresentKHR failed: out of memory");
+	}
+	else if (result == VK_ERROR_DEVICE_LOST)
+	{
+		throw std::runtime_error("vkQueuePresentKHR failed: device lost");
+	}
+	else
+	{
+		throw std::runtime_error("vkQueuePresentKHR failed");
+	}
 }
 
-void VulkanSwapChain::releaseResources()
-{
-	releaseViews();
-	if (swapChain)
-		vkDestroySwapchainKHR(device->device, swapChain, nullptr);
-}
-
-std::vector<VkSurfaceFormatKHR> VulkanSwapChain::getSurfaceFormats()
+std::vector<VkSurfaceFormatKHR> VulkanSwapChain::GetSurfaceFormats()
 {
 	uint32_t surfaceFormatCount = 0;
 	VkResult result = vkGetPhysicalDeviceSurfaceFormatsKHR(device->PhysicalDevice.Device, device->Surface->Surface, &surfaceFormatCount, nullptr);
@@ -378,7 +323,7 @@ std::vector<VkSurfaceFormatKHR> VulkanSwapChain::getSurfaceFormats()
 	return surfaceFormats;
 }
 
-std::vector<VkPresentModeKHR> VulkanSwapChain::getPresentModes(bool exclusivefullscreen)
+std::vector<VkPresentModeKHR> VulkanSwapChain::GetPresentModes(bool exclusivefullscreen)
 {
 #ifdef WIN32
 	if (exclusivefullscreen && device->SupportsDeviceExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))

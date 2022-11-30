@@ -75,14 +75,7 @@ class VulkanSwapChainBuilder
 public:
 	VulkanSwapChainBuilder();
 
-	VulkanSwapChainBuilder& VSync(bool enable);
-	VulkanSwapChainBuilder& Hdr(bool enable);
-
 	std::shared_ptr<VulkanSwapChain> Create(VulkanDevice* device);
-
-private:
-	bool vsync = true;
-	bool hdr = false;
 };
 
 class CommandPoolBuilder

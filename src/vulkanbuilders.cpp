@@ -1756,19 +1756,7 @@ VulkanSwapChainBuilder::VulkanSwapChainBuilder()
 {
 }
 
-VulkanSwapChainBuilder& VulkanSwapChainBuilder::VSync(bool enable)
-{
-	vsync = enable;
-	return *this;
-}
-
-VulkanSwapChainBuilder& VulkanSwapChainBuilder::Hdr(bool enable)
-{
-	hdr = enable;
-	return *this;
-}
-
 std::shared_ptr<VulkanSwapChain> VulkanSwapChainBuilder::Create(VulkanDevice* device)
 {
-	return std::make_shared<VulkanSwapChain>(device, vsync/*, hdr*/);
+	return std::make_shared<VulkanSwapChain>(device);
 }

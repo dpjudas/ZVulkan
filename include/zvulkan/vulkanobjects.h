@@ -1105,7 +1105,8 @@ inline VulkanImage::VulkanImage(VulkanDevice *device, VkImage image, VmaAllocati
 
 inline VulkanImage::~VulkanImage()
 {
-	vmaDestroyImage(device->allocator, image, allocation);
+	if (allocation)
+		vmaDestroyImage(device->allocator, image, allocation);
 }
 
 inline void *VulkanImage::Map(size_t offset, size_t size)
