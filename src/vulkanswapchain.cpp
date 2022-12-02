@@ -20,13 +20,12 @@ void VulkanSwapChain::Create(int width, int height, int imageCount, bool vsync, 
 {
 	views.clear();
 	images.clear();
-	lost = false;
 
 	SelectFormat(hdr);
 	SelectPresentMode(vsync, exclusivefullscreen);
 
 	VkSwapchainKHR oldSwapchain = swapchain;
-	CreateSwapchain(width, height, exclusivefullscreen, oldSwapchain);
+	CreateSwapchain(width, height, imageCount, exclusivefullscreen, oldSwapchain);
 	if (oldSwapchain)
 		vkDestroySwapchainKHR(device->device, oldSwapchain, nullptr);
 
@@ -39,7 +38,7 @@ void VulkanSwapChain::Create(int width, int height, int imageCount, bool vsync, 
 		SelectPresentMode(vsync, exclusivefullscreen);
 
 		oldSwapchain = swapchain;
-		CreateSwapchain(width, height, exclusivefullscreen, oldSwapchain);
+		CreateSwapchain(width, height, imageCount, exclusivefullscreen, oldSwapchain);
 		if (oldSwapchain)
 			vkDestroySwapchainKHR(device->device, oldSwapchain, nullptr);
 	}
@@ -59,7 +58,7 @@ void VulkanSwapChain::Create(int width, int height, int imageCount, bool vsync, 
 
 		for (VkImage vkimage : swapchainImages)
 		{
-			auto image = std::make_unique<VulkanImage>(device, vkimage, VK_NULL_HANDLE, actualExtent.width, actualExtent.height, 1, 1);
+			auto image = std::make_unique<VulkanImage>(device, vkimage, nullptr, actualExtent.width, actualExtent.height, 1, 1);
 			auto view = ImageViewBuilder()
 				.Type(VK_IMAGE_VIEW_TYPE_2D)
 				.Image(image.get(), format.format)
@@ -132,8 +131,10 @@ void VulkanSwapChain::SelectPresentMode(bool vsync, bool exclusivefullscreen)
 	}
 }
 
-bool VulkanSwapChain::CreateSwapchain(int width, int height, bool exclusivefullscreen, VkSwapchainKHR oldSwapChain)
+bool VulkanSwapChain::CreateSwapchain(int width, int height, int imageCount, bool exclusivefullscreen, VkSwapchainKHR oldSwapChain)
 {
+	lost = false;
+
 	VkSurfaceCapabilitiesKHR surfaceCapabilities;
 #ifdef WIN32
 	if (exclusivefullscreen && device->SupportsDeviceExtension(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME))
@@ -173,14 +174,11 @@ bool VulkanSwapChain::CreateSwapchain(int width, int height, bool exclusivefulls
 	if (actualExtent.width == 0 || actualExtent.height == 0)
 	{
 		swapchain = VK_NULL_HANDLE;
+		lost = true;
 		return false;
 	}
 
-	uint32_t imageCount = surfaceCapabilities.minImageCount + 1;
-	if (surfaceCapabilities.maxImageCount > 0 && imageCount > surfaceCapabilities.maxImageCount)
-		imageCount = surfaceCapabilities.maxImageCount;
-
-	imageCount = std::min(imageCount, (uint32_t)2); // Only use two buffers (triple buffering sucks! good for benchmarks, bad for mouse input)
+	imageCount = std::max(surfaceCapabilities.minImageCount, std::min(surfaceCapabilities.maxImageCount, (uint32_t)imageCount));
 
 	VkSwapchainCreateInfoKHR swapChainCreateInfo = { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
 	swapChainCreateInfo.surface = device->Surface->Surface;
@@ -227,6 +225,7 @@ bool VulkanSwapChain::CreateSwapchain(int width, int height, bool exclusivefulls
 	if (result != VK_SUCCESS)
 	{
 		swapchain = VK_NULL_HANDLE;
+		lost = true;
 		return false;
 	}
 
