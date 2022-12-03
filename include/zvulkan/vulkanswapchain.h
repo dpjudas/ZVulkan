@@ -30,7 +30,7 @@ private:
 	void SelectFormat(bool hdr);
 	void SelectPresentMode(bool vsync, bool exclusivefullscreen);
 
-	bool CreateSwapchain(int width, int height, bool exclusivefullscreen, VkSwapchainKHR oldSwapChain = VK_NULL_HANDLE);
+	bool CreateSwapchain(int width, int height, int imageCount, bool exclusivefullscreen, VkSwapchainKHR oldSwapChain = VK_NULL_HANDLE);
 
 	std::vector<VkSurfaceFormatKHR> GetSurfaceFormats();
 	std::vector<VkPresentModeKHR> GetPresentModes(bool exclusivefullscreen);
