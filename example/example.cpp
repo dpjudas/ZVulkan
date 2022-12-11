@@ -76,77 +76,6 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 		auto swapchain = VulkanSwapChainBuilder()
 			.Create(device.get());
 
-		// GLSL for a vertex shader
-		std::string vertexCode = R"(
-			#version 450
-
-			vec2 positions[3] = vec2[](
-				vec2(0.0, -0.5),
-				vec2(0.5, 0.5),
-				vec2(-0.5, 0.5)
-			);
-
-			vec4 colors[3] = vec4[](
-				vec4(1.0, 0.0, 0.0, 1.0),
-				vec4(0.0, 1.0, 0.0, 1.0),
-				vec4(0.0, 0.0, 1.0, 1.0)
-			);
-
-			layout(location = 0) out vec4 color;
-
-			void main() {
-				color = colors[gl_VertexIndex];
-				gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
-			}
-		)";
-
-		// GLSL for a fragment shader
-		std::string fragmentCode = R"(
-			#version 450
-
-			layout(location = 0) in vec4 color;
-			layout(location = 0) out vec4 outColor;
-
-			void main() {
-				outColor = color;
-			}
-		)";
-
-		// Create a vertex shader
-		auto vertexShader = ShaderBuilder()
-			.VertexShader(vertexCode)
-			.DebugName("vertexShader")
-			.Create("vertex", device.get());
-
-		// Create a fragment shader
-		auto fragmentShader = ShaderBuilder()
-			.FragmentShader(fragmentCode)
-			.DebugName("fragmentShader")
-			.Create("frag", device.get());
-
-		// Create a render pass where we clear the frame buffer when it begins and ends the pass by transitioning the image to what the swap chain needs to present it
-		auto renderPass = RenderPassBuilder()
-			.AddAttachment(VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-			.AddSubpass()
-			.AddSubpassColorAttachmentRef(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-			.Create(device.get());
-
-		// Create a pipeline layout (descriptor sets used by the pipeline)
-		auto pipelineLayout = PipelineLayoutBuilder()
-			.DebugName("pipelineLayout")
-			.Create(device.get());
-
-		// Create a pipeline (which shaders to use, blending rules, etc.)
-		auto pipeline = GraphicsPipelineBuilder()
-			.RenderPass(renderPass.get())
-			.Layout(pipelineLayout.get())
-			.AddVertexShader(vertexShader.get())
-			.AddFragmentShader(fragmentShader.get())
-			.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
-			.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
-			.DebugName("pipeline")
-			.Create(device.get());
-
 		// Create a command buffer pool
 		auto commandPool = CommandPoolBuilder()
 			.DebugName("commandPool")
@@ -167,9 +96,306 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.DebugName("presentFinishedFence")
 			.Create(device.get());
 
+		// Keep track on which frame buffers we have created for the current swap chain and what size they have
 		std::vector<std::unique_ptr<VulkanFramebuffer>> framebuffers;
 		int lastWidth = 0;
 		int lastHeight = 0;
+
+		// GLSL for a vertex shader
+
+		std::string vertexCode = R"(
+			#version 450
+
+			layout(set = 0, binding = 0, std140) uniform Uniforms
+			{
+				mat4 ProjectionMatrix;
+				mat4 ViewMatrix;
+			};
+
+			layout(location = 0) in vec4 aPosition;
+			layout(location = 1) in vec2 aTexCoord;
+			layout(location = 2) in vec4 aColor;
+
+			layout(location = 0) out vec2 texCoord;
+			layout(location = 1) out vec4 color;
+
+			void main()
+			{
+				texCoord = aTexCoord;
+				color = aColor;
+				gl_Position = ProjectionMatrix * ViewMatrix * aPosition;
+			}
+		)";
+
+		// GLSL for two fragment shaders. One textured and one without
+
+		std::string fragmentShaderNoTexCode = R"(
+			#version 450
+
+			layout(location = 0) in vec2 texCoord;
+			layout(location = 1) in vec4 color;
+			layout(location = 0) out vec4 outColor;
+
+			void main()
+			{
+				outColor = color;
+			}
+		)";
+
+		std::string fragmentShaderTexturedCode = R"(
+			#version 450
+
+			layout(set = 1, binding = 0) uniform sampler2D Texture;
+
+			layout(location = 0) in vec2 texCoord;
+			layout(location = 1) in vec4 color;
+			layout(location = 0) out vec4 outColor;
+
+			void main()
+			{
+				outColor = texture(Texture, texCoord) * color;
+			}
+		)";
+
+		struct Vertex
+		{
+			Vertex() = default;
+			Vertex(float x, float y, float z, float u, float v, float r, float g, float b, float a) : x(x), y(y), z(z), u(u), v(v), r(r), g(g), b(b), a(a) { }
+
+			float x, y, z;
+			float u, v;
+			float r, g, b, a;
+		};
+
+		struct Uniforms
+		{
+			float ProjectionMatrix[16];
+			float ViewMatrix[16];
+		};
+
+		// Create a vertex shader
+
+		auto vertexShader = ShaderBuilder()
+			.VertexShader(vertexCode)
+			.DebugName("vertexShader")
+			.Create("vertex", device.get());
+
+		// Create fragment shaders
+
+		auto fragmentShaderNoTex = ShaderBuilder()
+			.FragmentShader(fragmentShaderNoTexCode)
+			.DebugName("fragmentShaderNoTex")
+			.Create("fragmentShaderNoTex", device.get());
+
+		auto fragmentShaderTextured = ShaderBuilder()
+			.FragmentShader(fragmentShaderTexturedCode)
+			.DebugName("fragmentShaderTextured")
+			.Create("fragmentShaderTextured", device.get());
+
+		// Create descriptor set layouts
+
+		auto uniformSetLayout = DescriptorSetLayoutBuilder()
+			.AddBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT)
+			.DebugName("uniformSetLayout")
+			.Create(device.get());
+
+		auto textureSetLayout = DescriptorSetLayoutBuilder()
+			.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT)
+			.DebugName("textureSetLayout")
+			.Create(device.get());
+
+		// Create a pipeline layouts
+
+		auto pipelineLayoutNoTex = PipelineLayoutBuilder()
+			.AddSetLayout(uniformSetLayout.get())
+			.DebugName("pipelineLayoutNoTex")
+			.Create(device.get());
+
+		auto pipelineLayoutTextured = PipelineLayoutBuilder()
+			.AddSetLayout(uniformSetLayout.get())
+			.AddSetLayout(textureSetLayout.get())
+			.DebugName("pipelineLayoutTextured")
+			.Create(device.get());
+
+		// Create a render pass where we clear the frame buffer when it begins and ends the pass by transitioning the image to what the swap chain needs to present it
+
+		auto renderPass = RenderPassBuilder()
+			.AddAttachment(VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+			.AddSubpass()
+			.AddSubpassColorAttachmentRef(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+			.Create(device.get());
+
+		// Create pipelines (which shaders to use, blending rules, etc.)
+
+		auto pipelineNoTex = GraphicsPipelineBuilder()
+			.RenderPass(renderPass.get())
+			.Layout(pipelineLayoutNoTex.get())
+			.AddVertexBufferBinding(0, sizeof(Vertex))
+			.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
+			.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
+			.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
+			.AddVertexShader(vertexShader.get())
+			.AddFragmentShader(fragmentShaderNoTex.get())
+			.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
+			.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+			.DebugName("pipelineNoTex")
+			.Create(device.get());
+
+		auto pipelineTextured = GraphicsPipelineBuilder()
+			.RenderPass(renderPass.get())
+			.Layout(pipelineLayoutTextured.get())
+			.AddVertexBufferBinding(0, sizeof(Vertex))
+			.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
+			.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
+			.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
+			.AddVertexShader(vertexShader.get())
+			.AddFragmentShader(fragmentShaderTextured.get())
+			.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
+			.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+			.DebugName("pipelineTextured")
+			.Create(device.get());
+
+		// Create a persistently mapped vertex buffer
+
+		size_t maxVertices = 1'000'000;
+
+		auto vertexBuffer = BufferBuilder()
+			.Usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_UNKNOWN, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT)
+			.MemoryType(
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+			.Size(maxVertices)
+			.DebugName("vertexBuffer")
+			.Create(device.get());
+
+		Vertex* vertices = (Vertex*)vertexBuffer->Map(0, sizeof(Vertex) * 6);
+
+		// Create a persistently mapped uniform buffer
+
+		auto uniformsBuffer = BufferBuilder()
+			.Usage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_UNKNOWN, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT)
+			.MemoryType(
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+			.Size(sizeof(Uniforms))
+			.DebugName("uniformsBuffer")
+			.Create(device.get());
+
+		Uniforms* uniforms = (Uniforms*)uniformsBuffer->Map(0, sizeof(Uniforms));
+
+		// Create persistently mapped staging buffer used for texture uploads
+
+		size_t uploadBufferSize = 16 * 1024 * 1024;
+
+		auto uploadBuffer = BufferBuilder()
+			.Usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_UNKNOWN, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT)
+			.MemoryType(
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+			.Size(uploadBufferSize)
+			.DebugName("uploadBuffer")
+			.Create(device.get());
+
+		uint8_t* uploads = (uint8_t*)uploadBuffer->Map(0, uploadBufferSize);
+
+		// Put a texture in the upload buffer
+
+		uint32_t* pixels = (uint32_t*)uploads;
+		for (int y = 0; y < 64; y++)
+		{
+			for (int x = 0; x < 64; x++)
+			{
+				uint32_t tilepattern = ((x / 4 + y / 4) % 2) * 255;
+				uint32_t red = tilepattern;
+				uint32_t green = tilepattern;
+				uint32_t blue = tilepattern;
+				uint32_t alpha = 255;
+				pixels[x + y * 64] = red | (green << 8) | (blue << 16) | (alpha << 24);
+			}
+		}
+
+		// Create sampler object
+
+		auto sampler = SamplerBuilder()
+			.MinFilter(VK_FILTER_NEAREST)
+			.MagFilter(VK_FILTER_NEAREST)
+			.DebugName("sampler")
+			.Create(device.get());
+
+		// Create image and view objects
+
+		auto textureImage = ImageBuilder()
+			.Usage(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+			.Format(VK_FORMAT_R8G8B8A8_UNORM)
+			.Size(64, 64)
+			.DebugName("textureImage")
+			.Create(device.get());
+
+		auto textureView = ImageViewBuilder()
+			.Type(VK_IMAGE_VIEW_TYPE_2D)
+			.Image(textureImage.get(), VK_FORMAT_R8G8B8A8_UNORM)
+			.DebugName("textureView")
+			.Create(device.get());
+
+		// Create descriptor set for the uniform buffer
+
+		auto uniformSetPool = DescriptorPoolBuilder()
+			.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1)
+			.MaxSets(1)
+			.DebugName("uniformBufferPool")
+			.Create(device.get());
+
+		auto uniformSet = uniformSetPool->allocate(uniformSetLayout.get());
+
+		WriteDescriptors()
+			.AddBuffer(uniformSet.get(), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uniformsBuffer.get())
+			.Execute(device.get());
+
+		// Create descriptor set for the texture
+
+		auto textureSetPool = DescriptorPoolBuilder()
+			.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1)
+			.MaxSets(1)
+			.DebugName("textureSetPool")
+			.Create(device.get());
+
+		auto textureSet = textureSetPool->allocate(textureSetLayout.get());
+
+		WriteDescriptors()
+			.AddCombinedImageSampler(textureSet.get(), 0, textureView.get(), sampler.get(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+			.Execute(device.get());
+
+		// Copy the pixels from the upload buffer to the image object and transition the image to the layout suitable for texture sampling
+
+		auto transfercommands = commandPool->createBuffer();
+
+		transfercommands->begin();
+
+		PipelineBarrier()
+			.AddImage(textureImage.get(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT)
+			.Execute(transfercommands.get(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+		VkBufferImageCopy region = {};
+		region.imageExtent.width = 64;
+		region.imageExtent.height = 64;
+		region.imageExtent.depth = 1;
+		region.imageSubresource.layerCount = 1;
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		transfercommands->copyBufferToImage(uploadBuffer->buffer, textureImage->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+		PipelineBarrier()
+			.AddImage(textureImage.get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT)
+			.Execute(transfercommands.get(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+		transfercommands->end();
+
+		// Submit the command buffer and wait for the device to finish the upload
+
+		QueueSubmit()
+			.AddCommandBuffer(transfercommands.get())
+			.Execute(device.get(), device->GraphicsQueue);
+
+		vkDeviceWaitIdle(device->device);
 
 		// Draw a scene and pump window messages until the window is closed
 		while (!exitFlag)
@@ -218,9 +444,29 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			int imageIndex = swapchain->AcquireImage(imageAvailableSemaphore.get());
 			if (imageIndex != -1)
 			{
+				float identityMatrix[16] =
+				{
+					1.0f, 0.0f, 0.0f, 0.0f,
+					0.0f, 1.0f, 0.0f, 0.0f,
+					0.0f, 0.0f, 1.0f, 0.0f,
+					0.0f, 0.0f, 0.0f, 1.0f
+				};
+
+				// Update the uniform buffer
+				memcpy(uniforms->ProjectionMatrix, identityMatrix, sizeof(float) * 16);
+				memcpy(uniforms->ViewMatrix, identityMatrix, sizeof(float) * 16);
+
+				// Update the vertex buffer
+				vertices[0] = Vertex(-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.5f, 0.5f, 1.0f);
+				vertices[1] = Vertex( 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, 0.5f, 1.0f);
+				vertices[2] = Vertex( 0.0f,  0.5f, 0.0f, 0.5f, 1.0f, 0.5f, 0.5f, 1.0f, 1.0f);
+				vertices[3] = Vertex(-0.4f, 0.4f, 0.0f, 0.0f, 0.0f, 0.5f, 0.5f, 1.0f, 1.0f);
+				vertices[4] = Vertex(0.4f, 0.4f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, 0.5f, 1.0f);
+				vertices[5] = Vertex(0.0f, -0.4f, 0.0f, 0.5f, 1.0f, 1.0f, 0.5f, 0.5f, 1.0f);
+
 				// Create a command buffer and begin adding commands to it
-				auto commands = commandPool->createBuffer();
-				commands->begin();
+				auto drawcommands = commandPool->createBuffer();
+				drawcommands->begin();
 
 				// Begin a render pass
 				RenderPassBegin()
@@ -229,34 +475,44 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 					.AddClearColor(0.0f, 0.0f, 0.1f, 1.0f)
 					.AddClearDepthStencil(1.0f, 0)
 					.RenderArea(0, 0, width, height)
-					.Execute(commands.get());
+					.Execute(drawcommands.get());
 
 				// Set the viewport to cover the window
 				VkViewport viewport = {};
 				viewport.width = (float)width;
 				viewport.height = (float)height;
 				viewport.maxDepth = 1.0f;
-				commands->setViewport(0, 1, &viewport);
+				drawcommands->setViewport(0, 1, &viewport);
 
 				// Set the scissor box
 				VkRect2D scissor = {};
 				scissor.extent.width = width;
 				scissor.extent.height = height;
-				commands->setScissor(0, 1, &scissor);
+				drawcommands->setScissor(0, 1, &scissor);
 
-				// Bind the pipeline
-				commands->bindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get());
+				// Bind the vertex buffer
+				VkDeviceSize offset = 0;
+				drawcommands->bindVertexBuffers(0, 1, &vertexBuffer->buffer, &offset);
 
-				// Draw a triangle
-				commands->draw(3, 1, 0, 0);
+				// Bind the uniform buffer once (share it between the pipelines)
+				drawcommands->bindDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayoutNoTex.get(), 0, uniformSet.get());
+
+				// Draw a triangle with gradient
+				drawcommands->bindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineNoTex.get());
+				drawcommands->draw(3, 1, 0, 0);
+
+				// Draw a triangle with a texture
+				drawcommands->bindDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayoutTextured.get(), 1, textureSet.get());
+				drawcommands->bindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineTextured.get());
+				drawcommands->draw(3, 1, 3, 0);
 
 				// End rendering
-				commands->endRenderPass();
-				commands->end();
+				drawcommands->endRenderPass();
+				drawcommands->end();
 
 				// Submit command buffer to the graphics queue
 				QueueSubmit()
-					.AddCommandBuffer(commands.get())
+					.AddCommandBuffer(drawcommands.get())
 					.AddWait(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, imageAvailableSemaphore.get())
 					.AddSignal(renderFinishedSemaphore.get())
 					.Execute(device.get(), device->GraphicsQueue, presentFinishedFence.get());
@@ -269,6 +525,10 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 				vkResetFences(device->device, 1, &presentFinishedFence->fence);
 			}
 		}
+
+		vertexBuffer->Unmap();
+		uniformsBuffer->Unmap();
+		uploadBuffer->Unmap();
 
 		return 0;
 	}
