@@ -527,13 +527,27 @@ BufferBuilder& BufferBuilder::MemoryType(VkMemoryPropertyFlags requiredFlags, Vk
 	return *this;
 }
 
+BufferBuilder& BufferBuilder::MinAlignment(VkDeviceSize memoryAlignment)
+{
+	minAlignment = memoryAlignment;
+	return *this;
+}
+
 std::unique_ptr<VulkanBuffer> BufferBuilder::Create(VulkanDevice* device)
 {
 	VkBuffer buffer;
 	VmaAllocation allocation;
 
-	VkResult result = vmaCreateBuffer(device->allocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr);
-	CheckVulkanError(result, "Could not allocate memory for vulkan buffer");
+	if (minAlignment == 0)
+	{
+		VkResult result = vmaCreateBuffer(device->allocator, &bufferInfo, &allocInfo, &buffer, &allocation, nullptr);
+		CheckVulkanError(result, "Could not allocate memory for vulkan buffer");
+	}
+	else
+	{
+		VkResult result = vmaCreateBufferWithAlignment(device->allocator, &bufferInfo, &allocInfo, minAlignment, &buffer, &allocation, nullptr);
+		CheckVulkanError(result, "Could not allocate memory for vulkan buffer");
+	}
 
 	auto obj = std::make_unique<VulkanBuffer>(device, buffer, allocation, bufferInfo.size);
 	if (debugName)
