@@ -212,7 +212,7 @@ bool VulkanSwapChain::CreateSwapchain(int width, int height, int imageCount, boo
 	swapChainCreateInfo.preTransform = surfaceCapabilities.currentTransform;
 	swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // If alpha channel is passed on to the DWM or not
 	swapChainCreateInfo.presentMode = presentMode;
-	swapChainCreateInfo.clipped = VK_FALSE;// VK_TRUE;
+	swapChainCreateInfo.clipped = VK_TRUE; // Applications SHOULD set this value to VK_TRUE if they do not expect to read back the content of presentable images before presenting them or after reacquiring them, and if their fragment shaders do not have any side effects that require them to run for all pixels in the presentable image
 	swapChainCreateInfo.oldSwapchain = oldSwapChain;
 
 #ifdef WIN32
