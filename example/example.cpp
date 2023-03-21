@@ -114,9 +114,12 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			};
 		)";
 
-		std::string vertexCode = R"(
+		std::string versionBlock = R"(
 			#version 450
 			#extension GL_GOOGLE_include_directive : enable
+		)";
+
+		std::string vertexCode = R"(
 
 			#include "uniforms.glsl"
 
@@ -138,7 +141,6 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 		// GLSL for two fragment shaders. One textured and one without
 
 		std::string fragmentShaderNoTexCode = R"(
-			#version 450
 
 			layout(location = 0) in vec2 texCoord;
 			layout(location = 1) in vec4 color;
@@ -151,7 +153,6 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 		)";
 
 		std::string fragmentShaderTexturedCode = R"(
-			#version 450
 
 			layout(set = 1, binding = 0) uniform sampler2D Texture;
 
@@ -185,6 +186,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		auto vertexShader = ShaderBuilder()
 			.Type(ShaderType::Vertex)
+			.AddSource("versionblock", versionBlock)
 			.AddSource("vertexCode.glsl", vertexCode)
 			.OnIncludeLocal([=](auto headerName, auto includerName, size_t depth) { if (headerName == "uniforms.glsl") return ShaderIncludeResult(headerName, includedCode); else return ShaderIncludeResult("File not found: " + headerName); })
 			.DebugName("vertexShader")
@@ -194,12 +196,14 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		auto fragmentShaderNoTex = ShaderBuilder()
 			.Type(ShaderType::Fragment)
+			.AddSource("versionblock", versionBlock)
 			.AddSource("fragmentShaderNoTexCode.glsl", fragmentShaderNoTexCode)
 			.DebugName("fragmentShaderNoTex")
 			.Create("fragmentShaderNoTex", device.get());
 
 		auto fragmentShaderTextured = ShaderBuilder()
 			.Type(ShaderType::Fragment)
+			.AddSource("versionblock", versionBlock)
 			.AddSource("fragmentShaderTexturedCode.glsl", fragmentShaderTexturedCode)
 			.DebugName("fragmentShaderTextured")
 			.Create("fragmentShaderTextured", device.get());
