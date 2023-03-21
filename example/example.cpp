@@ -19,6 +19,8 @@ void VulkanError(const char* message)
 
 #ifdef WIN32
 
+#pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
 bool exitFlag;
 
 LRESULT CALLBACK ZVulkanWindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -37,6 +39,7 @@ LRESULT CALLBACK ZVulkanWindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lp
 
 int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
 {
+	HWND hwnd = 0;
 	try
 	{
 		// Create a window class for the win32 window
@@ -52,7 +55,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			throw std::runtime_error("RegisterClassEx failed");
 
 		// Create and show the window
-		HWND hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, L"ZVulkanWindow", L"ZVulkan Example", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 1280, 1024, 0, 0, GetModuleHandle(nullptr), nullptr);
+		hwnd = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW, L"ZVulkanWindow", L"ZVulkan Example", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 1280, 1024, 0, 0, GetModuleHandle(nullptr), nullptr);
 		if (!hwnd)
 			throw std::runtime_error("CreateWindowEx failed");
 
@@ -103,14 +106,19 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		// GLSL for a vertex shader
 
-		std::string vertexCode = R"(
-			#version 450
-
+		std::string includedCode = R"(
 			layout(set = 0, binding = 0, std140) uniform Uniforms
 			{
 				mat4 ProjectionMatrix;
 				mat4 ViewMatrix;
 			};
+		)";
+
+		std::string vertexCode = R"(
+			#version 450
+			#extension GL_GOOGLE_include_directive : enable
+
+			#include "uniforms.glsl"
 
 			layout(location = 0) in vec4 aPosition;
 			layout(location = 1) in vec2 aTexCoord;
@@ -176,19 +184,23 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 		// Create a vertex shader
 
 		auto vertexShader = ShaderBuilder()
-			.VertexShader(vertexCode)
+			.Type(ShaderType::Vertex)
+			.AddSource("vertexCode.glsl", vertexCode)
+			.OnIncludeLocal([=](auto headerName, auto includerName, size_t depth) { if (headerName == "uniforms.glsl") return ShaderIncludeResult(headerName, includedCode); else return ShaderIncludeResult("File not found: " + headerName); })
 			.DebugName("vertexShader")
 			.Create("vertex", device.get());
 
 		// Create fragment shaders
 
 		auto fragmentShaderNoTex = ShaderBuilder()
-			.FragmentShader(fragmentShaderNoTexCode)
+			.Type(ShaderType::Fragment)
+			.AddSource("fragmentShaderNoTexCode.glsl", fragmentShaderNoTexCode)
 			.DebugName("fragmentShaderNoTex")
 			.Create("fragmentShaderNoTex", device.get());
 
 		auto fragmentShaderTextured = ShaderBuilder()
-			.FragmentShader(fragmentShaderTexturedCode)
+			.Type(ShaderType::Fragment)
+			.AddSource("fragmentShaderTexturedCode.glsl", fragmentShaderTexturedCode)
 			.DebugName("fragmentShaderTextured")
 			.Create("fragmentShaderTextured", device.get());
 
@@ -534,6 +546,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 	}
 	catch (const std::exception& e)
 	{
+		if (hwnd)
+			ShowWindow(hwnd, SW_HIDE);
 		MessageBoxA(0, e.what(), "Unhandled Exception", MB_OK);
 		return 0;
 	}
