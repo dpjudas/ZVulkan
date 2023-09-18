@@ -242,6 +242,7 @@ int VulkanSwapChain::AcquireImage(VulkanSemaphore* semaphore, VulkanFence* fence
 	else
 	{
 		VulkanError("Failed to acquire next image!");
+		return -1;
 	}
 }
 
