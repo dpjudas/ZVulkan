@@ -1,4 +1,3 @@
-#include <stdexcept>
 #include "vulkanbuilders.h"
 #include "vulkansurface.h"
 #include "vulkancompatibledevice.h"
