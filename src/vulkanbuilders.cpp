@@ -666,7 +666,7 @@ std::unique_ptr<VulkanBuffer> BufferBuilder::Create(VulkanDevice* device)
 		CheckVulkanError(result, "Could not allocate memory for vulkan buffer");
 	}
 
-	auto obj = std::make_unique<VulkanBuffer>(device, buffer, allocation, bufferInfo.size);
+	auto obj = std::make_unique<VulkanBuffer>(device, buffer, allocation, (size_t)bufferInfo.size);
 	if (debugName)
 		obj->SetDebugName(debugName);
 	return obj;
