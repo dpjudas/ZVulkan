@@ -1,4 +1,5 @@
-// Copyright (C) 2020 The Khronos Group Inc.
+//
+// Copyright (C) 2013 LunarG, Inc.
 //
 // All rights reserved.
 //
@@ -14,7 +15,7 @@
 //    disclaimer in the documentation and/or other materials provided
 //    with the distribution.
 //
-//    Neither the name of The Khronos Group Inc. nor the names of its
+//    Neither the name of 3Dlabs Inc. Ltd. nor the names of its
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
@@ -30,33 +31,65 @@
 // LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 // ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
+//
+#ifndef WORKLIST_H_INCLUDED
+#define WORKLIST_H_INCLUDED
 
-#ifndef GLSLANG_BUILD_INFO
-#define GLSLANG_BUILD_INFO
+#include "../glslang/OSDependent/osinclude.h"
+#include <list>
+#include <mutex>
+#include <string>
 
-#define GLSLANG_VERSION_MAJOR 11
-#define GLSLANG_VERSION_MINOR 6
-#define GLSLANG_VERSION_PATCH 0
-#define GLSLANG_VERSION_FLAVOR ""
+namespace glslang {
 
-#define GLSLANG_VERSION_GREATER_THAN(major, minor, patch) \
-    (((major) > GLSLANG_VERSION_MAJOR) || ((major) == GLSLANG_VERSION_MAJOR && \
-    (((minor) > GLSLANG_VERSION_MINOR) || ((minor) == GLSLANG_VERSION_MINOR && \
-     ((patch) > GLSLANG_VERSION_PATCH)))))
+    class TWorkItem {
+    public:
+        TWorkItem() { }
+        explicit TWorkItem(const std::string& s) :
+            name(s) { }
+        std::string name;
+        std::string results;
+        std::string resultsIndex;
+    };
 
-#define GLSLANG_VERSION_GREATER_OR_EQUAL_TO(major, minor, patch) \
-    (((major) > GLSLANG_VERSION_MAJOR) || ((major) == GLSLANG_VERSION_MAJOR && \
-    (((minor) > GLSLANG_VERSION_MINOR) || ((minor) == GLSLANG_VERSION_MINOR && \
-     ((patch) >= GLSLANG_VERSION_PATCH)))))
+    class TWorklist {
+    public:
+        TWorklist() { }
+        virtual ~TWorklist() { }
 
-#define GLSLANG_VERSION_LESS_THAN(major, minor, patch) \
-    (((major) < GLSLANG_VERSION_MAJOR) || ((major) == GLSLANG_VERSION_MAJOR && \
-    (((minor) < GLSLANG_VERSION_MINOR) || ((minor) == GLSLANG_VERSION_MINOR && \
-     ((patch) < GLSLANG_VERSION_PATCH)))))
+        void add(TWorkItem* item)
+        {
+            std::lock_guard<std::mutex> guard(mutex);
+            worklist.push_back(item);
+        }
 
-#define GLSLANG_VERSION_LESS_OR_EQUAL_TO(major, minor, patch) \
-    (((major) < GLSLANG_VERSION_MAJOR) || ((major) == GLSLANG_VERSION_MAJOR && \
-    (((minor) < GLSLANG_VERSION_MINOR) || ((minor) == GLSLANG_VERSION_MINOR && \
-     ((patch) <= GLSLANG_VERSION_PATCH)))))
+        bool remove(TWorkItem*& item)
+        {
+            std::lock_guard<std::mutex> guard(mutex);
 
-#endif // GLSLANG_BUILD_INFO
+            if (worklist.empty())
+                return false;
+            item = worklist.front();
+            worklist.pop_front();
+
+            return true;
+        }
+
+        int size()
+        {
+            return (int)worklist.size();
+        }
+
+        bool empty()
+        {
+            return worklist.empty();
+        }
+
+    protected:
+        std::mutex mutex;
+        std::list<TWorkItem*> worklist;
+    };
+
+} // end namespace glslang
+
+#endif // WORKLIST_H_INCLUDED
