@@ -4,6 +4,18 @@
 #include "vulkansurface.h"
 #include "vulkanbuilders.h"
 
+#if defined(WIN32)
+#define NOMINMAX
+#define WIN32_MEAN_AND_LEAN
+#include <Windows.h>
+#endif
+
+#if defined(WIN32)
+#define NOMINMAX
+#define WIN32_MEAN_AND_LEAN
+#include <Windows.h>
+#endif
+
 VulkanSwapChain::VulkanSwapChain(VulkanDevice* device) : device(device)
 {
 }
