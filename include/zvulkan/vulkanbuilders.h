@@ -408,8 +408,10 @@ public:
 
 	GraphicsPipelineBuilder& AddVertexBufferBinding(int index, size_t stride);
 	GraphicsPipelineBuilder& AddVertexAttribute(int location, int binding, VkFormat format, size_t offset);
-
+	
 	GraphicsPipelineBuilder& AddDynamicState(VkDynamicState state);
+
+	GraphicsPipelineBuilder& PolygonMode(VkPolygonMode mode) {rasterizer.polygonMode = mode; return *this;};
 
 	GraphicsPipelineBuilder& DebugName(const char* name) { debugName = name; return *this; }
 
