@@ -7,6 +7,10 @@
 #include <zvulkan/vulkanswapchain.h>
 #include <zvulkan/vulkanbuilders.h>
 
+#define NOMINMAX
+#define WIN32_MEAN_AND_LEAN
+#include <Windows.h>
+
 void VulkanPrintLog(const char* typestr, const std::string& msg)
 {
 	// Log messages from the validation layer here
@@ -61,7 +65,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		// Create vulkan instance
 		auto instance = VulkanInstanceBuilder()
-			.RequireSurfaceExtensions()
+			.RequireWin32Surface()
 			.DebugLayer(false)
 			.Create();
 
