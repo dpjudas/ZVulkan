@@ -17,15 +17,6 @@ public:
 	VulkanInstanceBuilder& RequireExtensions(const std::vector<const char*>& extensions);
 	VulkanInstanceBuilder& RequireExtensions(const char** extensions, size_t count);
 	VulkanInstanceBuilder& OptionalExtension(const std::string& extensionName);
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-	VulkanInstanceBuilder& RequireWin32Surface();
-#endif
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-	VulkanInstanceBuilder& RequireX11Surface();
-#endif
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-	VulkanInstanceBuilder& RequireWaylandSurface();
-#endif
 	VulkanInstanceBuilder& OptionalSwapchainColorspace();
 	VulkanInstanceBuilder& DebugLayer(bool enable = true);
 
@@ -37,23 +28,6 @@ private:
 	std::set<std::string> optionalExtensions;
 	bool debugLayer = false;
 };
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-
-class VulkanSurfaceBuilder
-{
-public:
-	VulkanSurfaceBuilder();
-
-	VulkanSurfaceBuilder& Win32Window(HWND handle);
-
-	std::shared_ptr<VulkanSurface> Create(std::shared_ptr<VulkanInstance> instance);
-
-private:
-	HWND hwnd = {};
-};
-
-#endif
 
 class VulkanDeviceBuilder
 {

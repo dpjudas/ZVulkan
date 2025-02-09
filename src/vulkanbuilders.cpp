@@ -1627,33 +1627,6 @@ VulkanInstanceBuilder& VulkanInstanceBuilder::RequireExtensions(const char** ext
 	return *this;
 }
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-VulkanInstanceBuilder& VulkanInstanceBuilder::RequireWin32Surface()
-{
-	RequireExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-	RequireExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-	return *this;
-}
-#endif
-
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-VulkanInstanceBuilder& VulkanInstanceBuilder::RequireX11Surface()
-{
-	RequireExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-	RequireExtension(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
-	return *this;
-}
-#endif
-
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-VulkanInstanceBuilder& VulkanInstanceBuilder::RequireWaylandSurface()
-{
-	RequireExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-	RequireExtension(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
-	return *this;
-}
-#endif
-
 VulkanInstanceBuilder& VulkanInstanceBuilder::OptionalSwapchainColorspace()
 {
 	OptionalExtension(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME); // For HDR support
@@ -1676,27 +1649,6 @@ std::shared_ptr<VulkanInstance> VulkanInstanceBuilder::Create()
 {
 	return std::make_shared<VulkanInstance>(apiVersionsToTry, requiredExtensions, optionalExtensions, debugLayer);
 }
-
-/////////////////////////////////////////////////////////////////////////////
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-
-VulkanSurfaceBuilder::VulkanSurfaceBuilder()
-{
-}
-
-VulkanSurfaceBuilder& VulkanSurfaceBuilder::Win32Window(HWND hwnd)
-{
-	this->hwnd = hwnd;
-	return *this;
-}
-
-std::shared_ptr<VulkanSurface> VulkanSurfaceBuilder::Create(std::shared_ptr<VulkanInstance> instance)
-{
-	return std::make_shared<VulkanSurface>(std::move(instance), hwnd);
-}
-
-#endif
 
 /////////////////////////////////////////////////////////////////////////////
 

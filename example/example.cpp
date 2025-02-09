@@ -65,14 +65,23 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		// Create vulkan instance
 		auto instance = VulkanInstanceBuilder()
-			.RequireWin32Surface()
+			.RequireExtension(VK_KHR_SURFACE_EXTENSION_NAME)
+			.RequireExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
 			.DebugLayer(false)
 			.Create();
 
 		// Create a surface for our window
-		auto surface = VulkanSurfaceBuilder()
-			.Win32Window(hwnd)
-			.Create(instance);
+		
+		VkWin32SurfaceCreateInfoKHR createInfo = { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
+		createInfo.hwnd = hwnd;
+		createInfo.hinstance = GetModuleHandle(nullptr);
+
+		VkSurfaceKHR surfaceHandle = {};
+		VkResult vkresult = vkCreateWin32SurfaceKHR(instance->Instance, &createInfo, nullptr, &surfaceHandle);
+		if (vkresult != VK_SUCCESS)
+			throw std::runtime_error("Could not create vulkan surface");
+
+		auto surface = std::make_shared<VulkanSurface>(instance, surfaceHandle);
 
 		// Create the vulkan device
 		auto device = VulkanDeviceBuilder()
@@ -446,7 +455,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 				lastHeight = height;
 				framebuffers.clear();
 
-				swapchain->Create(width, height, 1, true, false, false);
+				swapchain->Create(width, height, 1, true, false);
 
 				// Create frame buffer objects for the new swap chain images
 				for (int imageIndex = 0; imageIndex < swapchain->ImageCount(); imageIndex++)
