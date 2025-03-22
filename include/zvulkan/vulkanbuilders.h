@@ -389,6 +389,11 @@ public:
 	GraphicsPipelineBuilder& AddVertexShader(VulkanShader *shader);
 	GraphicsPipelineBuilder& AddFragmentShader(VulkanShader *shader);
 
+	GraphicsPipelineBuilder& AddConstant(uint32_t constantID, const void* data, size_t size);
+	GraphicsPipelineBuilder& AddConstant(uint32_t constantID, uint32_t value);
+	GraphicsPipelineBuilder& AddConstant(uint32_t constantID, int32_t value);
+	GraphicsPipelineBuilder& AddConstant(uint32_t constantID, float value);
+
 	GraphicsPipelineBuilder& AddVertexBufferBinding(int index, size_t stride);
 	GraphicsPipelineBuilder& AddVertexAttribute(int location, int binding, VkFormat format, size_t offset);
 	
@@ -418,6 +423,15 @@ private:
 	std::vector<VkVertexInputBindingDescription> vertexInputBindings;
 	std::vector<VkVertexInputAttributeDescription> vertexInputAttributes;
 	std::vector<VkDynamicState> dynamicStates;
+
+	struct ShaderSpecialization
+	{
+		VkSpecializationInfo info = {};
+		std::vector<VkSpecializationMapEntry> entries;
+		std::vector<uint8_t> data;
+	};
+
+	std::vector<std::unique_ptr<ShaderSpecialization>> specializations;
 
 	VulkanPipelineCache* cache = nullptr;
 	const char* debugName = nullptr;

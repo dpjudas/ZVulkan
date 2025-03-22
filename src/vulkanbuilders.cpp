@@ -1107,6 +1107,48 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddFragmentShader(VulkanShader
 	return *this;
 }
 
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddConstant(uint32_t constantID, const void* data, size_t size)
+{
+	VkPipelineShaderStageCreateInfo& stage = shaderStages.back();
+	if (!stage.pSpecializationInfo)
+	{
+		specializations.push_back(std::make_unique<ShaderSpecialization>());
+		stage.pSpecializationInfo = &specializations.back()->info;
+	}
+
+	ShaderSpecialization* s = specializations.back().get();
+
+	VkSpecializationMapEntry entry = {};
+	entry.constantID = constantID;
+	entry.offset = (uint32_t)s->data.size();
+	entry.size = (uint32_t)size;
+
+	s->data.insert(s->data.end(), (uint8_t*)data, (uint8_t*)data + size);
+	s->entries.push_back(entry);
+
+	s->info.mapEntryCount = (uint32_t)s->entries.size();
+	s->info.dataSize = (uint32_t)s->data.size();
+	s->info.pMapEntries = s->entries.data();
+	s->info.pData = s->data.data();
+
+	return *this;
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddConstant(uint32_t constantID, uint32_t value)
+{
+	return AddConstant(constantID, &value, sizeof(uint32_t));
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddConstant(uint32_t constantID, int32_t value)
+{
+	return AddConstant(constantID, &value, sizeof(int32_t));
+}
+
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddConstant(uint32_t constantID, float value)
+{
+	return AddConstant(constantID, &value, sizeof(float));
+}
+
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::AddVertexBufferBinding(int index, size_t stride)
 {
 	VkVertexInputBindingDescription desc = {};
