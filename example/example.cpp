@@ -67,7 +67,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 		auto instance = VulkanInstanceBuilder()
 			.RequireExtension(VK_KHR_SURFACE_EXTENSION_NAME)
 			.RequireExtension(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)
-			.DebugLayer(false)
+			.DebugLayer(true)
 			.Create();
 
 		// Create a surface for our window
@@ -239,7 +239,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.DebugName("textureSetLayout")
 			.Create(device.get());
 
-		// Create a pipeline layouts
+		// Create pipeline layouts
 
 		auto pipelineLayoutNoTex = PipelineLayoutBuilder()
 			.AddSetLayout(uniformSetLayout.get())
@@ -260,23 +260,75 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.AddSubpassColorAttachmentRef(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
 			.Create(device.get());
 
-		// Create pipelines (which shaders to use, blending rules, etc.)
+		// Create pipelines
 
-		auto pipelineNoTex = GraphicsPipelineBuilder()
-			.RenderPass(renderPass.get())
-			.Layout(pipelineLayoutNoTex.get())
-			.AddVertexBufferBinding(0, sizeof(Vertex))
-			.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
-			.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
-			.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
-			.AddVertexShader(vertexShader.get())
-			.AddFragmentShader(fragmentShaderNoTex.get())
-			.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
-			.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
-			.DebugName("pipelineNoTex")
-			.Create(device.get());
+		std::unique_ptr<VulkanPipeline> libraryNoTex, libraryBlend;
+		std::unique_ptr<VulkanPipeline> pipelineNoTex, pipelineTextured;
 
-		auto pipelineTextured = GraphicsPipelineBuilder()
+		// Can we use pipeline libraries?
+
+		if (device->EnabledFeatures.GraphicsPipelineLibrary.graphicsPipelineLibrary)
+		{
+			libraryNoTex = GraphicsPipelineBuilder()
+				.RenderPass(renderPass.get())
+				.Layout(pipelineLayoutNoTex.get())
+				.Flags(
+					VK_PIPELINE_CREATE_LIBRARY_BIT_KHR |
+					VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT)
+				.LibraryFlags(
+					VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT |
+					VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT |
+					VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT)
+				.AddVertexBufferBinding(0, sizeof(Vertex))
+				.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
+				.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
+				.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
+				.AddVertexShader(vertexShader.get())
+				.AddFragmentShader(fragmentShaderNoTex.get())
+				.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
+				.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+				.DebugName("libraryNoTex")
+				.Create(device.get());
+
+			libraryBlend = GraphicsPipelineBuilder()
+				.RenderPass(renderPass.get())
+				.Layout(pipelineLayoutNoTex.get())
+				.Flags(
+					VK_PIPELINE_CREATE_LIBRARY_BIT_KHR |
+					VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT)
+				.LibraryFlags(
+					VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT)
+				.AddColorBlendAttachment(ColorBlendAttachmentBuilder()
+					.AlphaBlendMode()
+					.Create())
+				.DebugName("libraryNoTex")
+				.Create(device.get());
+
+			pipelineNoTex = GraphicsPipelineBuilder()
+				.Flags(VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT)
+				.AddLibrary(libraryNoTex.get())
+				.AddLibrary(libraryBlend.get())
+				.DebugName("pipelineNoTex")
+				.Create(device.get());
+		}
+		else
+		{
+			pipelineNoTex = GraphicsPipelineBuilder()
+				.RenderPass(renderPass.get())
+				.Layout(pipelineLayoutNoTex.get())
+				.AddVertexBufferBinding(0, sizeof(Vertex))
+				.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
+				.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
+				.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
+				.AddVertexShader(vertexShader.get())
+				.AddFragmentShader(fragmentShaderNoTex.get())
+				.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
+				.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
+				.DebugName("pipelineNoTex")
+				.Create(device.get());
+		}
+
+		pipelineTextured = GraphicsPipelineBuilder()
 			.RenderPass(renderPass.get())
 			.Layout(pipelineLayoutTextured.get())
 			.AddVertexBufferBinding(0, sizeof(Vertex))
