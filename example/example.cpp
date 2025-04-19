@@ -197,35 +197,26 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 		// Create a vertex shader
 
-		auto vertexShader = ShaderBuilder()
-			.Code(GLSLCompiler()
-				.Type(ShaderType::Vertex)
-				.AddSource("versionblock", versionBlock)
-				.AddSource("vertexCode.glsl", vertexCode)
-				.OnIncludeLocal([=](auto headerName, auto includerName, size_t depth) { if (headerName == "uniforms.glsl") return ShaderIncludeResult(headerName, includedCode); else return ShaderIncludeResult("File not found: " + headerName); })
-				.Compile(device.get()))
-			.DebugName("vertexShader")
-			.Create("vertex", device.get());
+		auto vertexShader = GLSLCompiler()
+			.Type(ShaderType::Vertex)
+			.AddSource("versionblock", versionBlock)
+			.AddSource("vertexCode.glsl", vertexCode)
+			.OnIncludeLocal([=](auto headerName, auto includerName, size_t depth) { if (headerName == "uniforms.glsl") return ShaderIncludeResult(headerName, includedCode); else return ShaderIncludeResult("File not found: " + headerName); })
+			.Compile(device.get());
 
 		// Create fragment shaders
 
-		auto fragmentShaderNoTex = ShaderBuilder()
-			.Code(GLSLCompiler()
-				.Type(ShaderType::Fragment)
-				.AddSource("versionblock", versionBlock)
-				.AddSource("fragmentShaderNoTexCode.glsl", fragmentShaderNoTexCode)
-				.Compile(device.get()))
-			.DebugName("fragmentShaderNoTex")
-			.Create("fragmentShaderNoTex", device.get());
+		auto fragmentShaderNoTex = GLSLCompiler()
+			.Type(ShaderType::Fragment)
+			.AddSource("versionblock", versionBlock)
+			.AddSource("fragmentShaderNoTexCode.glsl", fragmentShaderNoTexCode)
+			.Compile(device.get());
 
-		auto fragmentShaderTextured = ShaderBuilder()
-			.Code(GLSLCompiler()
-				.Type(ShaderType::Fragment)
-				.AddSource("versionblock", versionBlock)
-				.AddSource("fragmentShaderTexturedCode.glsl", fragmentShaderTexturedCode)
-				.Compile(device.get()))
-			.DebugName("fragmentShaderTextured")
-			.Create("fragmentShaderTextured", device.get());
+		auto fragmentShaderTextured = GLSLCompiler()
+			.Type(ShaderType::Fragment)
+			.AddSource("versionblock", versionBlock)
+			.AddSource("fragmentShaderTexturedCode.glsl", fragmentShaderTexturedCode)
+			.Compile(device.get());
 
 		// Create descriptor set layouts
 
@@ -283,8 +274,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 				.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
 				.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
 				.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
-				.AddVertexShader(vertexShader.get())
-				.AddFragmentShader(fragmentShaderNoTex.get())
+				.AddVertexShader(vertexShader)
+				.AddFragmentShader(fragmentShaderNoTex)
 				.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 				.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 				.DebugName("libraryNoTex")
@@ -320,8 +311,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 				.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
 				.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
 				.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
-				.AddVertexShader(vertexShader.get())
-				.AddFragmentShader(fragmentShaderNoTex.get())
+				.AddVertexShader(vertexShader)
+				.AddFragmentShader(fragmentShaderNoTex)
 				.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 				.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 				.DebugName("pipelineNoTex")
@@ -335,8 +326,8 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 			.AddVertexAttribute(0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, x))
 			.AddVertexAttribute(1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, u))
 			.AddVertexAttribute(2, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(Vertex, r))
-			.AddVertexShader(vertexShader.get())
-			.AddFragmentShader(fragmentShaderTextured.get())
+			.AddVertexShader(vertexShader)
+			.AddFragmentShader(fragmentShaderTextured)
 			.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT)
 			.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR)
 			.DebugName("pipelineTextured")
