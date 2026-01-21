@@ -1505,12 +1505,14 @@ PipelineBarrier& PipelineBarrier::AddQueueTransfer(int srcFamily, int dstFamily,
 	return *this;
 }
 
-PipelineBarrier& PipelineBarrier::AddQueueTransfer(int srcFamily, int dstFamily, VulkanImage* image, VkImageLayout layout, VkImageAspectFlags aspectMask, int baseMipLevel, int levelCount)
+PipelineBarrier& PipelineBarrier::AddQueueTransfer(int srcFamily, int dstFamily, VulkanImage* image, VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags aspectMask, int baseMipLevel, int levelCount)
 {
 	VkImageMemoryBarrier barrier = { };
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout = layout;
-	barrier.newLayout = layout;
+	barrier.srcAccessMask = srcAccessMask;
+	barrier.dstAccessMask = dstAccessMask;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
 	barrier.srcQueueFamilyIndex = srcFamily;
 	barrier.dstQueueFamilyIndex = dstFamily;
 	barrier.image = image->image;
@@ -1900,6 +1902,20 @@ std::vector<VulkanCompatibleDevice> VulkanDeviceBuilder::FindDevices(const std::
 				dev.GraphicsFamily = i;
 				dev.GraphicsTimeQueries = queueFamily.timestampValidBits != 0;
 				break;
+			}
+		}
+
+		// Try finding a dedicated transfer queue family
+		for (int i = 0; i < (int)info.QueueFamilies.size(); i++)
+		{
+			const auto& queueFamily = info.QueueFamilies[i];
+			if (queueFamily.queueCount > 0 && (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT))
+			{
+				if (!(queueFamily.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)))
+				{
+					dev.TransferFamily = i;
+					break;
+				}
 			}
 		}
 

@@ -11,6 +11,7 @@ public:
 
 	int GraphicsFamily = -1;
 	int PresentFamily = -1;
+	int TransferFamily = -1;
 
 	bool GraphicsTimeQueries = false;
 

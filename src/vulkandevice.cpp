@@ -14,6 +14,7 @@ VulkanDevice::VulkanDevice(std::shared_ptr<VulkanInstance> instance, std::shared
 
 	GraphicsFamily = selectedDevice.GraphicsFamily;
 	PresentFamily = selectedDevice.PresentFamily;
+	TransferFamily = selectedDevice.TransferFamily;
 	GraphicsTimeQueries = selectedDevice.GraphicsTimeQueries;
 
 	try
@@ -80,6 +81,8 @@ void VulkanDevice::CreateDevice()
 		neededFamilies.insert(GraphicsFamily);
 	if (PresentFamily != -1)
 		neededFamilies.insert(PresentFamily);
+	if (TransferFamily != -1)
+		neededFamilies.insert(TransferFamily);
 
 	for (int index : neededFamilies)
 	{
@@ -156,6 +159,8 @@ void VulkanDevice::CreateDevice()
 		vkGetDeviceQueue(device, GraphicsFamily, 0, &GraphicsQueue);
 	if (PresentFamily != -1)
 		vkGetDeviceQueue(device, PresentFamily, 0, &PresentQueue);
+	if (TransferFamily != -1)
+		vkGetDeviceQueue(device, TransferFamily, 0, &TransferQueue);
 }
 
 void VulkanDevice::ReleaseResources()

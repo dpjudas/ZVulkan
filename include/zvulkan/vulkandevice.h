@@ -43,9 +43,11 @@ public:
 
 	VkQueue GraphicsQueue = VK_NULL_HANDLE;
 	VkQueue PresentQueue = VK_NULL_HANDLE;
+	VkQueue TransferQueue = VK_NULL_HANDLE;
 
 	int GraphicsFamily = -1;
 	int PresentFamily = -1;
+	int TransferFamily = -1;
 	bool GraphicsTimeQueries = false;
 
 	bool SupportsExtension(const char* ext) const;
