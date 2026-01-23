@@ -134,7 +134,7 @@ void VulkanDevice::CreateDevice()
 		*next = &EnabledFeatures.RayQuery;
 		next = &EnabledFeatures.RayQuery.pNext;
 	}
-	if (SupportsExtension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME))
+	if (Instance->ApiVersion >= VK_API_VERSION_1_2 || SupportsExtension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME))
 	{
 		*next = &EnabledFeatures.DescriptorIndexing;
 		next = &EnabledFeatures.DescriptorIndexing.pNext;
